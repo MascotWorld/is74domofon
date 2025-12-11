@@ -1,0 +1,33 @@
+# Example configuration file for IS74 Integration
+# Copy this to config.yaml and fill in your credentials
+
+is74:
+  username: "your_username"
+  password: "your_password"
+
+settings:
+  auto_open_enabled: false
+  auto_open_schedule:
+    - days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+      time_start: "08:00"
+      time_end: "18:00"
+  log_level: "INFO"
+  stream_quality: "high"
+
+# Firebase Cloud Messaging (FCM) configuration
+# Used for receiving push notifications (calls, door events, etc.)
+# API key can be obtained from Firebase Console: https://console.firebase.google.com/
+# Project: intersvyazlk
+firebase:
+  # Firebase API key (optional, can also be set via FIREBASE_API_KEY environment variable)
+  # If not provided, the library will attempt to register without it
+  api_key: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBJZCI6IjE6MzYxMTgwNzY1MTc1OmFuZHJvaWQ6OWMwZmFmZmZhNmM2MDA2MiIsImV4cCI6MTc2NTk3NzY5NiwiZmlkIjoiZTBQeW5FRnhReU9vT2tlWjl1WW5WaCIsInByb2plY3ROdW1iZXIiOjM2MTE4MDc2NTE3NX0.AB2LPV8wRQIhALGvvglRtK2_98K_iyo100bB3ifbaSo33ex75wKc1KX6AiB3XJKHvCi-55TLJ5M6gtTDaG0Zxoq2mAxiP5W7uUGOFw"
+  
+  # These are pre-configured for IS74 and usually don't need to be changed
+  project_id: "intersvyazlk"
+  app_id: "1:361180765175:android:9c0fafffa6c60062"
+  sender_id: "361180765175"
+
+home_assistant:
+  url: "http://homeassistant.local:8123"
+  token: "your_long_lived_access_token"

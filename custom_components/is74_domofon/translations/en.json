@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to IS74 Intercom",
+        "description": "Enter your IS74 API server address",
+        "data": {
+          "api_url": "API Server URL"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to server",
+      "auth_required": "Server requires authentication",
+      "service_not_ready": "Service is not ready",
+      "unknown": "Unknown error"
+    },
+    "abort": {
+      "already_configured": "Already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "IS74 Intercom Settings",
+        "data": {
+          "scan_interval": "Update interval (seconds)",
+          "auto_open_enabled": "Auto-open by default"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "service_status": {
+        "name": "Service Status"
+      },
+      "fcm_status": {
+        "name": "Push Notifications"
+      }
+    },
+    "switch": {
+      "auto_open": {
+        "name": "Auto Open"
+      },
+      "courier": {
+        "name": "Courier Mode"
+      },
+      "fcm": {
+        "name": "Push Notifications"
+      }
+    },
+    "button": {
+      "open_door": {
+        "name": "Open Door"
+      },
+      "reject_call": {
+        "name": "Reject Call"
+      },
+      "web_panel": {
+        "name": "Web Panel"
+      }
+    }
+  }
+}
+

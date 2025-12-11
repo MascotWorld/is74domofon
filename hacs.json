@@ -1,0 +1,10 @@
+{
+  "name": "IS74 Домофон",
+  "homeassistant": "2023.1.0",
+  "render_readme": true,
+  "country": ["RU"],
+  "zip_release": false,
+  "filename": "is74-domofon-card.js",
+  "content_in_root": false
+}
+

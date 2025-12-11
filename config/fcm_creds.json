@@ -1,0 +1,36 @@
+{
+  "keys": {
+    "public": "BLvJ-NRPl_YbwEaJ0abpoDRAyZw0DlOQUlkydIi_BKj10wFCK4l9goiyY1c449NHXIBeT0xexYMiCboANUJwg1E=",
+    "private": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgqWrhjg6Gx_M7jY1yWO3SX-EU8364IPiv2EHlaibbi5uhRANCAAS7yfjUT5f2G8BGidGm6aA0QMmcNA5TkFJZMnSIvwSo9dMBQiuJfYKIsmNXOOPTR1yAXk9MXsWDIgm6ADVCcINR",
+    "secret": "8LbfhVC_S7o5pwPyHZA0_Q=="
+  },
+  "gcm": {
+    "token": "e0wC0AD69B4:APA91bFP-B7Uhg62UM3CyOSvVxs5VW-j8kPeSxqQ-kM8mi-KNw0G6a3kJbMVSzcAhns1lX4OIXN-b7W9C2s0SnnNXg7im0rGSZqvdCU9IHEUYxfZSyERACoCcYyrgAtDLzcL5I3AQ4UP",
+    "app_id": "wp:receiver.push.com#11fe0a6e-dabb-4bc6-93af-be6237907c55",
+    "android_id": "4701350982548852955",
+    "security_token": "5991425920873910767"
+  },
+  "fcm": {
+    "registration": {
+      "name": "projects/intersvyazlk/registrations/e1qfJEpZEyZgwtGculilKi:APA91bHsTLqQ37UCWE8oyUZTmkOjI8ndPf9QahRTSy33dfigVXfi1kwWb09ldqTpKu4Or6a63OUJCF-3uVmqPNBG8A6a3q0kPYKE3_7tWB4YrgfwCN-Ksp4",
+      "token": "e1qfJEpZEyZgwtGculilKi:APA91bHsTLqQ37UCWE8oyUZTmkOjI8ndPf9QahRTSy33dfigVXfi1kwWb09ldqTpKu4Or6a63OUJCF-3uVmqPNBG8A6a3q0kPYKE3_7tWB4YrgfwCN-Ksp4",
+      "web": {
+        "endpoint": "https://fcm.googleapis.com/fcm/send/e0wC0AD69B4:APA91bFP-B7Uhg62UM3CyOSvVxs5VW-j8kPeSxqQ-kM8mi-KNw0G6a3kJbMVSzcAhns1lX4OIXN-b7W9C2s0SnnNXg7im0rGSZqvdCU9IHEUYxfZSyERACoCcYyrgAtDLzcL5I3AQ4UP",
+        "p256dh": "BLvJ-NRPl_YbwEaJ0abpoDRAyZw0DlOQUlkydIi_BKj10wFCK4l9goiyY1c449NHXIBeT0xexYMiCboANUJwg1E=",
+        "auth": "8LbfhVC_S7o5pwPyHZA0_Q=="
+      }
+    },
+    "installation": {
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBJZCI6IjE6MzYxMTgwNzY1MTc1OmFuZHJvaWQ6OWMwZmFmZmZhNmM2MDA2MiIsImV4cCI6MTc2NjA0NTI0MSwiZmlkIjoiZTFxZkpFcFpFeVpnd3RHY3VsaWxLaSIsInByb2plY3ROdW1iZXIiOjM2MTE4MDc2NTE3NX0.AB2LPV8wRgIhAJncqNOThgNye5pQzjq8qaDAyxxDMdbziVO45NgDbKPOAiEArdI7cWAV6ttbx-bQ3XEQi8Yaqz3u5q0RlvlrVA8T5V0",
+      "expires_in": 604800,
+      "refresh_token": "3_AS3qfwI69fAie-12hN5x4anYeJmJwf7rQdAmFqOV-NcXB7v9vXZNXbyPbcxFrrSQqhBrUHw0fvKDLR-LE1hJp8bY-Ci4EhabVzyJOB43s9cOEys",
+      "fid": "e1qfJEpZEyZgwtGculilKi",
+      "created_at": 3709390.365043083
+    }
+  },
+  "config": {
+    "bundle_id": "receiver.push.com",
+    "project_id": "intersvyazlk",
+    "vapid_key": "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4"
+  }
+}

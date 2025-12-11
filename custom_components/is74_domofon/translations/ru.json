@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Подключение к IS74 Домофон",
+        "description": "Введите адрес вашего IS74 API сервера",
+        "data": {
+          "api_url": "URL API сервера"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к серверу",
+      "auth_required": "Требуется авторизация на сервере",
+      "service_not_ready": "Сервис не готов",
+      "unknown": "Неизвестная ошибка"
+    },
+    "abort": {
+      "already_configured": "Уже настроено"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройки IS74 Домофон",
+        "data": {
+          "scan_interval": "Интервал обновления (секунды)",
+          "auto_open_enabled": "Автооткрытие по умолчанию"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "service_status": {
+        "name": "Статус сервиса"
+      },
+      "fcm_status": {
+        "name": "Push уведомления"
+      }
+    },
+    "switch": {
+      "auto_open": {
+        "name": "Автооткрытие"
+      },
+      "courier": {
+        "name": "Режим курьера"
+      },
+      "fcm": {
+        "name": "Push уведомления"
+      }
+    },
+    "button": {
+      "open_door": {
+        "name": "Открыть дверь"
+      },
+      "reject_call": {
+        "name": "Сбросить звонок"
+      },
+      "web_panel": {
+        "name": "Веб-панель"
+      }
+    }
+  }
+}
+

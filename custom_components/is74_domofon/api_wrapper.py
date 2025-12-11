@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -14,16 +15,30 @@ _LOGGER = logging.getLogger(__name__)
 IS74_API_URL = "https://api.is74.ru"
 USER_AGENT = "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
 
-# Global session
+# Global session and state
 _session: aiohttp.ClientSession | None = None
 _device_id: str | None = None
+_auth_id: str | None = None
 
 
 def get_config_path() -> Path:
     """Get config directory path."""
-    config_dir = Path.home() / ".homeassistant" / "is74_domofon"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir
+    # Try different possible locations
+    paths = [
+        Path("/config/is74_domofon"),  # HA Docker
+        Path.home() / ".homeassistant" / "is74_domofon",  # HA Core
+        Path("config"),  # Local development
+    ]
+    
+    for path in paths:
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            return path
+        except Exception:
+            continue
+    
+    # Fallback
+    return Path.home() / ".is74_domofon"
 
 
 def load_tokens() -> dict | None:
@@ -32,16 +47,19 @@ def load_tokens() -> dict | None:
     if tokens_file.exists():
         try:
             return json.loads(tokens_file.read_text())
-        except Exception:
-            pass
+        except Exception as e:
+            _LOGGER.error(f"Failed to load tokens: {e}")
     return None
 
 
 def save_tokens(data: dict) -> bool:
     """Save tokens to config."""
     try:
-        tokens_file = get_config_path() / "tokens.json"
+        config_path = get_config_path()
+        config_path.mkdir(parents=True, exist_ok=True)
+        tokens_file = config_path / "tokens.json"
         tokens_file.write_text(json.dumps(data, indent=2))
+        _LOGGER.info(f"Tokens saved to {tokens_file}")
         return True
     except Exception as e:
         _LOGGER.error(f"Failed to save tokens: {e}")
@@ -58,8 +76,8 @@ async def get_session() -> aiohttp.ClientSession:
             tokens = load_tokens()
             _device_id = tokens.get("device_id") if tokens else None
             if not _device_id:
-                import uuid
                 _device_id = uuid.uuid4().hex[:16]
+                _LOGGER.info(f"Generated new device_id: {_device_id}")
         
         headers = {
             "User-Agent": USER_AGENT,
@@ -79,25 +97,47 @@ async def get_session() -> aiohttp.ClientSession:
 
 async def request_auth_code(phone: str) -> dict:
     """Request SMS auth code."""
-    global _device_id
+    global _device_id, _auth_id
+    
+    # Generate new device ID for auth flow
+    _device_id = uuid.uuid4().hex[:16]
+    _LOGGER.info(f"Using device_id for auth: {_device_id}")
+    
+    # Close existing session to use new device_id
+    global _session
+    if _session and not _session.closed:
+        await _session.close()
+        _session = None
     
     session = await get_session()
     
-    # Generate device ID for this session
-    import uuid
-    _device_id = uuid.uuid4().hex[:16]
+    # Correct endpoint: /mobile/auth/get-confirm
+    url = f"{IS74_API_URL}/mobile/auth/get-confirm"
+    data = {
+        "deviceId": _device_id,
+        "phone": phone
+    }
     
-    url = f"{IS74_API_URL}/auth/request-code"
-    data = {"phone": phone}
+    _LOGGER.info(f"Requesting auth code from {url}")
     
     async with session.post(url, json=data) as resp:
+        text = await resp.text()
+        _LOGGER.info(f"Auth response status: {resp.status}, body: {text[:500]}")
+        
         if resp.status != 200:
-            text = await resp.text()
             raise Exception(f"Failed to request code: {text}")
         
-        result = await resp.json()
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError:
+            raise Exception(f"Invalid JSON response: {text}")
         
-        # Save phone and device_id for verification
+        # Store authId from response
+        if isinstance(result, dict) and "authId" in result:
+            _auth_id = result["authId"]
+            _LOGGER.info(f"Received authId: {_auth_id}")
+        
+        # Save phone and device_id
         save_tokens({"phone": phone, "device_id": _device_id})
         
         return result
@@ -105,49 +145,97 @@ async def request_auth_code(phone: str) -> dict:
 
 async def verify_auth_code(phone: str, code: str) -> dict:
     """Verify SMS code and get access token."""
+    global _auth_id
+    
     session = await get_session()
     
-    url = f"{IS74_API_URL}/auth/confirm-code"
-    data = {"phone": phone, "code": code}
+    # Step 1: Check confirm code
+    # Correct endpoint: /mobile/auth/check-confirm
+    url = f"{IS74_API_URL}/mobile/auth/check-confirm"
     
-    async with session.post(url, json=data) as resp:
+    # Send as form-urlencoded
+    body = f"phone={phone}&confirmCode={code}&authId"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    
+    _LOGGER.info(f"Verifying code at {url}")
+    
+    async with session.post(url, data=body, headers=headers) as resp:
+        text = await resp.text()
+        _LOGGER.info(f"Check-confirm response: {resp.status}, body: {text[:500]}")
+        
         if resp.status != 200:
-            text = await resp.text()
             raise Exception(f"Failed to verify code: {text}")
         
-        result = await resp.json()
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError:
+            raise Exception(f"Invalid JSON response: {text}")
         
-        # Check if we need to select address
-        if result.get("ADDRESSES"):
-            # Multiple addresses - use first one
-            addresses = result["ADDRESSES"]
-            if addresses:
-                user_id = addresses[0].get("USER_ID")
-                profile_id = addresses[0].get("ID")
-                
-                # Select address
-                select_url = f"{IS74_API_URL}/auth/select-profile"
-                select_data = {"user_id": user_id, "profile_id": profile_id}
-                
-                async with session.post(select_url, json=select_data) as select_resp:
-                    if select_resp.status == 200:
-                        result = await select_resp.json()
+        # Get authId and addresses
+        auth_id = result.get("authId")
+        addresses = result.get("addresses", [])
         
-        # Save tokens
-        tokens = load_tokens() or {}
-        tokens.update({
-            "access_token": result.get("TOKEN") or result.get("access_token"),
-            "user_id": result.get("USER_ID") or result.get("user_id"),
-            "profile_id": result.get("PROFILE_ID") or result.get("profile_id"),
-            "phone": phone,
-        })
-        save_tokens(tokens)
+        if not auth_id:
+            raise Exception("No authId in response")
         
-        # Update session with new token
-        global _session
-        _session = None  # Force recreate with new token
+        if not addresses:
+            raise Exception("No addresses in response")
         
-        return {"user_id": tokens.get("user_id"), "profile_id": tokens.get("profile_id")}
+        # Use first address
+        user_id = int(addresses[0].get("USER_ID", 0))
+        
+        if not user_id:
+            raise Exception("No USER_ID in address")
+        
+        _LOGGER.info(f"Got authId: {auth_id}, user_id: {user_id}")
+        
+        # Step 2: Get access token
+        # Correct endpoint: /mobile/auth/get-token
+        token_url = f"{IS74_API_URL}/mobile/auth/get-token"
+        token_data = {
+            "authId": auth_id,
+            "userId": str(user_id),
+            "uniqueDeviceId": _device_id
+        }
+        
+        _LOGGER.info(f"Getting token from {token_url}")
+        
+        async with session.post(token_url, data=token_data, headers=headers) as token_resp:
+            token_text = await token_resp.text()
+            _LOGGER.info(f"Get-token response: {token_resp.status}, body: {token_text[:500]}")
+            
+            if token_resp.status != 200:
+                raise Exception(f"Failed to get token: {token_text}")
+            
+            try:
+                token_result = json.loads(token_text)
+            except json.JSONDecodeError:
+                raise Exception(f"Invalid token JSON: {token_text}")
+            
+            # Save tokens
+            tokens = load_tokens() or {}
+            tokens.update({
+                "access_token": token_result.get("TOKEN"),
+                "user_id": token_result.get("USER_ID"),
+                "profile_id": token_result.get("PROFILE_ID"),
+                "phone": phone,
+                "device_id": _device_id,
+                "authId": auth_id,
+            })
+            save_tokens(tokens)
+            
+            # Reset session to use new token
+            global _session
+            if _session and not _session.closed:
+                await _session.close()
+                _session = None
+            
+            _LOGGER.info("Authentication successful!")
+            
+            return {
+                "user_id": tokens.get("user_id"),
+                "profile_id": tokens.get("profile_id")
+            }
 
 
 async def get_devices() -> list[dict[str, Any]]:
@@ -158,11 +246,25 @@ async def get_devices() -> list[dict[str, Any]]:
     params = {"pagination": "1", "pageSize": "30", "page": "1", "isShared": "1"}
     
     async with session.get(url, params=params) as resp:
+        if resp.status == 401:
+            _LOGGER.warning("Not authenticated")
+            return []
+        
         if resp.status != 200:
+            _LOGGER.error(f"Failed to get devices: {resp.status}")
             return []
         
         result = await resp.json()
         items = result if isinstance(result, list) else result.get("items", [])
+        
+        # If empty, try isShared=0
+        if not items:
+            params["isShared"] = "0"
+            params["mainFirst"] = "1"
+            async with session.get(url, params=params) as resp2:
+                if resp2.status == 200:
+                    result2 = await resp2.json()
+                    items = result2 if isinstance(result2, list) else result2.get("items", [])
         
         devices = []
         for item in items:
@@ -204,8 +306,8 @@ async def get_cameras() -> list[dict[str, Any]]:
             for group in result:
                 if isinstance(group, dict) and "cameras" in group:
                     for cam in group.get("cameras", []):
-                        uuid = cam.get("UUID") or cam.get("uuid")
-                        if not uuid:
+                        cam_uuid = cam.get("UUID") or cam.get("uuid")
+                        if not cam_uuid:
                             continue
                         
                         # Get snapshot URL
@@ -219,7 +321,7 @@ async def get_cameras() -> list[dict[str, Any]]:
                                     snapshot_url = live.get("LOSSY") or live.get("MAIN")
                         
                         cameras.append({
-                            "uuid": str(uuid),
+                            "uuid": str(cam_uuid),
                             "name": cam.get("NAME") or cam.get("ADDRESS") or "Камера",
                             "status": "online" if cam.get("ACCESS", {}).get("LIVE", {}).get("STATUS") else "offline",
                             "is_online": bool(cam.get("ACCESS", {}).get("LIVE", {}).get("STATUS")),
@@ -259,13 +361,6 @@ async def open_door(device_id: str) -> dict:
 
 async def get_video_stream(camera_uuid: str) -> dict:
     """Get video stream URL."""
-    cameras = await get_cameras()
-    camera = next((c for c in cameras if c["uuid"] == camera_uuid), None)
-    
-    if not camera:
-        raise Exception(f"Camera not found: {camera_uuid}")
-    
-    # Get HLS URL from camera data
     session = await get_session()
     url = "https://cams.is74.ru/api/self-cams-with-group"
     
@@ -286,12 +381,20 @@ async def get_video_stream(camera_uuid: str) -> dict:
                             if isinstance(live, dict):
                                 stream_url = live.get("LOW_LATENCY") or live.get("MAIN")
                                 if stream_url:
+                                    # Get snapshot URL
+                                    snapshot = media.get("SNAPSHOT", {})
+                                    snapshot_url = None
+                                    if isinstance(snapshot, dict):
+                                        live_snap = snapshot.get("LIVE", {})
+                                        if isinstance(live_snap, dict):
+                                            snapshot_url = live_snap.get("LOSSY") or live_snap.get("MAIN")
+                                    
                                     return {
                                         "camera_uuid": camera_uuid,
                                         "stream_url": stream_url,
                                         "format": "HLS",
                                         "is_available": True,
-                                        "snapshot_url": camera.get("snapshot_url"),
+                                        "snapshot_url": snapshot_url,
                                     }
     
     return {"camera_uuid": camera_uuid, "is_available": False}
@@ -299,22 +402,19 @@ async def get_video_stream(camera_uuid: str) -> dict:
 
 async def get_fcm_status() -> dict:
     """Get FCM status."""
-    # For now, return basic status
-    # Full FCM integration would require additional setup
+    tokens = load_tokens()
     return {
         "fcm_initialized": False,
         "listener_running": False,
-        "authenticated": bool(load_tokens() and load_tokens().get("access_token")),
+        "authenticated": bool(tokens and tokens.get("access_token")),
     }
 
 
 async def start_fcm() -> None:
     """Start FCM listener."""
-    # FCM requires firebase-messaging library
     _LOGGER.info("FCM start requested - not implemented in embedded mode")
 
 
 async def stop_fcm() -> None:
     """Stop FCM listener."""
     _LOGGER.info("FCM stop requested")
-

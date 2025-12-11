@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 from aiohttp import web
@@ -12,12 +13,11 @@ _LOGGER = logging.getLogger(__name__)
 
 # Global state
 _server_runner: web.AppRunner | None = None
-_api_client = None
-_auth_manager = None
 _auto_open_enabled = False
+_executor = ThreadPoolExecutor(max_workers=2)
 
 
-async def setup_server(hass, port: int = 8000) -> bool:
+async def setup_server(hass, port: int = 8099) -> bool:
     """Set up the embedded API server."""
     global _server_runner
     
@@ -85,39 +85,10 @@ async def cors_middleware(request: web.Request, handler):
     return response
 
 
-def get_config_path() -> Path:
-    """Get config directory path."""
-    # Use HA config directory
-    config_dir = Path.home() / ".homeassistant" / "is74_domofon"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir
-
-
-def load_tokens() -> dict | None:
-    """Load tokens from config."""
-    tokens_file = get_config_path() / "tokens.json"
-    if tokens_file.exists():
-        try:
-            return json.loads(tokens_file.read_text())
-        except Exception:
-            pass
-    return None
-
-
-def save_tokens(data: dict) -> bool:
-    """Save tokens to config."""
-    try:
-        tokens_file = get_config_path() / "tokens.json"
-        tokens_file.write_text(json.dumps(data, indent=2))
-        return True
-    except Exception as e:
-        _LOGGER.error(f"Failed to save tokens: {e}")
-        return False
-
-
-def is_authenticated() -> bool:
+async def is_authenticated() -> bool:
     """Check if authenticated."""
-    tokens = load_tokens()
+    from .api_wrapper import load_tokens
+    tokens = await load_tokens()
     return bool(tokens and tokens.get("access_token"))
 
 
@@ -125,102 +96,137 @@ def is_authenticated() -> bool:
 
 async def handle_root(request: web.Request) -> web.Response:
     """Handle root request."""
-    html = """
+    authenticated = await is_authenticated()
+    
+    html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>IS74 Домофон</title>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body { font-family: system-ui; max-width: 600px; margin: 50px auto; padding: 20px; background: #1a1a2e; color: #eee; }
-            h1 { color: #e94560; }
-            .card { background: #16213e; padding: 20px; border-radius: 12px; margin: 20px 0; }
-            input { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 8px; box-sizing: border-box; }
-            button { background: #e94560; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 16px; }
-            button:hover { background: #c81e45; }
-            .status { padding: 10px; border-radius: 8px; margin: 10px 0; }
-            .status.ok { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
-            .status.error { background: rgba(248, 113, 113, 0.2); color: #f87171; }
-            #result { margin-top: 20px; }
+            * {{ box-sizing: border-box; }}
+            body {{ font-family: system-ui, -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #1a1a2e; color: #eee; min-height: 100vh; }}
+            h1 {{ color: #e94560; text-align: center; margin-bottom: 30px; }}
+            .card {{ background: #16213e; padding: 24px; border-radius: 16px; margin: 20px 0; }}
+            input {{ width: 100%; padding: 14px; margin: 10px 0; border: 2px solid #0f3460; border-radius: 10px; background: #1a1a2e; color: #fff; font-size: 16px; }}
+            input:focus {{ outline: none; border-color: #e94560; }}
+            button {{ background: linear-gradient(135deg, #e94560, #c81e45); color: white; padding: 14px 24px; border: none; border-radius: 10px; cursor: pointer; width: 100%; font-size: 16px; font-weight: 600; margin-top: 10px; }}
+            button:hover {{ background: linear-gradient(135deg, #c81e45, #a01535); }}
+            button:disabled {{ opacity: 0.5; cursor: not-allowed; }}
+            .status {{ padding: 12px 16px; border-radius: 10px; margin: 15px 0; text-align: center; font-weight: 500; }}
+            .status.ok {{ background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }}
+            .status.error {{ background: rgba(248, 113, 113, 0.15); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); }}
+            .status.info {{ background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }}
+            #result {{ margin-top: 15px; padding: 12px; border-radius: 8px; display: none; }}
+            .hidden {{ display: none !important; }}
+            .loading {{ opacity: 0.7; pointer-events: none; }}
+            h3 {{ margin: 0 0 20px; color: #fff; }}
         </style>
     </head>
     <body>
         <h1>🏠 IS74 Домофон</h1>
-        <div id="status-box" class="card">
+        
+        <div class="card">
             <h3>Статус</h3>
-            <div id="auth-status" class="status">Проверка...</div>
+            <div id="auth-status" class="status {'ok' if authenticated else 'error'}">
+                {'✓ Авторизован' if authenticated else '✗ Требуется авторизация'}
+            </div>
         </div>
         
-        <div id="auth-form" class="card" style="display:none;">
+        <div id="auth-form" class="card {'hidden' if authenticated else ''}">
             <h3>Авторизация</h3>
-            <input type="tel" id="phone" placeholder="Номер телефона (без +7)" />
-            <button onclick="requestCode()">Запросить код</button>
-            <div id="code-form" style="display:none; margin-top: 20px;">
-                <input type="text" id="code" placeholder="Код из SMS" />
-                <button onclick="verifyCode()">Подтвердить</button>
+            <input type="tel" id="phone" placeholder="Номер телефона (без +7)" inputmode="numeric" />
+            <button onclick="requestCode()" id="btn-request">Запросить код</button>
+            
+            <div id="code-section" class="hidden" style="margin-top: 20px;">
+                <input type="text" id="code" placeholder="Код из SMS" inputmode="numeric" maxlength="6" />
+                <button onclick="verifyCode()" id="btn-verify">Подтвердить</button>
             </div>
+            
             <div id="result"></div>
         </div>
         
-        <div id="control-panel" class="card" style="display:none;">
+        <div id="control-panel" class="card {'hidden' if not authenticated else ''}">
             <h3>Управление</h3>
-            <p>Используйте карточку в Home Assistant для управления домофоном.</p>
-            <button onclick="location.reload()">Обновить статус</button>
+            <div class="status info">Используйте карточку в Home Assistant</div>
+            <button onclick="location.reload()" style="margin-top: 20px; background: #0f3460;">🔄 Обновить статус</button>
         </div>
         
         <script>
-            async function checkStatus() {
-                try {
-                    const res = await fetch('/status');
+            function showResult(msg, isError) {{
+                const el = document.getElementById('result');
+                el.style.display = 'block';
+                el.className = 'status ' + (isError ? 'error' : 'ok');
+                el.textContent = msg;
+            }}
+            
+            async function requestCode() {{
+                const phone = document.getElementById('phone').value.trim();
+                if (!phone) {{ showResult('Введите номер телефона', true); return; }}
+                
+                const btn = document.getElementById('btn-request');
+                btn.disabled = true;
+                btn.textContent = 'Отправка...';
+                
+                try {{
+                    const res = await fetch('/auth/login', {{
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        body: JSON.stringify({{phone}})
+                    }});
                     const data = await res.json();
-                    const statusEl = document.getElementById('auth-status');
                     
-                    if (data.authenticated) {
-                        statusEl.className = 'status ok';
-                        statusEl.textContent = '✓ Авторизован';
-                        document.getElementById('auth-form').style.display = 'none';
-                        document.getElementById('control-panel').style.display = 'block';
-                    } else {
-                        statusEl.className = 'status error';
-                        statusEl.textContent = '✗ Требуется авторизация';
-                        document.getElementById('auth-form').style.display = 'block';
-                        document.getElementById('control-panel').style.display = 'none';
-                    }
-                } catch(e) {
-                    document.getElementById('auth-status').textContent = 'Ошибка: ' + e.message;
-                }
-            }
+                    if (res.ok) {{
+                        showResult('✓ SMS код отправлен', false);
+                        document.getElementById('code-section').classList.remove('hidden');
+                        document.getElementById('code').focus();
+                    }} else {{
+                        showResult(data.error || data.detail || 'Ошибка', true);
+                    }}
+                }} catch(e) {{
+                    showResult('Ошибка: ' + e.message, true);
+                }}
+                
+                btn.disabled = false;
+                btn.textContent = 'Запросить код';
+            }}
             
-            async function requestCode() {
-                const phone = document.getElementById('phone').value;
-                const res = await fetch('/auth/login', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({phone})
-                });
-                const data = await res.json();
-                document.getElementById('result').textContent = data.message || data.detail;
-                if (res.ok) {
-                    document.getElementById('code-form').style.display = 'block';
-                }
-            }
+            async function verifyCode() {{
+                const phone = document.getElementById('phone').value.trim();
+                const code = document.getElementById('code').value.trim();
+                if (!code) {{ showResult('Введите код из SMS', true); return; }}
+                
+                const btn = document.getElementById('btn-verify');
+                btn.disabled = true;
+                btn.textContent = 'Проверка...';
+                
+                try {{
+                    const res = await fetch('/auth/verify', {{
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        body: JSON.stringify({{phone, code}})
+                    }});
+                    const data = await res.json();
+                    
+                    if (res.ok) {{
+                        showResult('✓ Авторизация успешна!', false);
+                        setTimeout(() => location.reload(), 1500);
+                    }} else {{
+                        showResult(data.error || data.detail || 'Неверный код', true);
+                    }}
+                }} catch(e) {{
+                    showResult('Ошибка: ' + e.message, true);
+                }}
+                
+                btn.disabled = false;
+                btn.textContent = 'Подтвердить';
+            }}
             
-            async function verifyCode() {
-                const phone = document.getElementById('phone').value;
-                const code = document.getElementById('code').value;
-                const res = await fetch('/auth/verify', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({phone, code})
-                });
-                const data = await res.json();
-                document.getElementById('result').textContent = data.message || data.detail || 'Успешно!';
-                if (res.ok) {
-                    setTimeout(() => location.reload(), 1000);
-                }
-            }
-            
-            checkStatus();
+            // Submit on Enter
+            document.getElementById('phone').addEventListener('keypress', e => {{ if (e.key === 'Enter') requestCode(); }});
+            document.getElementById('code').addEventListener('keypress', e => {{ if (e.key === 'Enter') verifyCode(); }});
         </script>
     </body>
     </html>
@@ -230,19 +236,19 @@ async def handle_root(request: web.Request) -> web.Response:
 
 async def handle_status(request: web.Request) -> web.Response:
     """Handle status request."""
+    authenticated = await is_authenticated()
     return web.json_response({
         "status": "running",
-        "authenticated": is_authenticated(),
+        "authenticated": authenticated,
         "version": "1.0.0",
     })
 
 
 async def handle_devices(request: web.Request) -> web.Response:
     """Handle devices request."""
-    if not is_authenticated():
+    if not await is_authenticated():
         return web.json_response({"error": "Not authenticated"}, status=401)
     
-    # Import and use the API client
     try:
         from .api_wrapper import get_devices
         devices = await get_devices()
@@ -254,7 +260,7 @@ async def handle_devices(request: web.Request) -> web.Response:
 
 async def handle_cameras(request: web.Request) -> web.Response:
     """Handle cameras request."""
-    if not is_authenticated():
+    if not await is_authenticated():
         return web.json_response({"error": "Not authenticated"}, status=401)
     
     try:
@@ -268,7 +274,7 @@ async def handle_cameras(request: web.Request) -> web.Response:
 
 async def handle_open_door(request: web.Request) -> web.Response:
     """Handle open door request."""
-    if not is_authenticated():
+    if not await is_authenticated():
         return web.json_response({"error": "Not authenticated"}, status=401)
     
     try:
@@ -276,7 +282,7 @@ async def handle_open_door(request: web.Request) -> web.Response:
         device_id = data.get("device_id")
         
         from .api_wrapper import open_door
-        result = await open_door(device_id)
+        await open_door(device_id)
         
         return web.json_response({
             "success": True,
@@ -309,10 +315,11 @@ async def handle_fcm_status(request: web.Request) -> web.Response:
         status = await get_fcm_status()
         return web.json_response(status)
     except Exception:
+        authenticated = await is_authenticated()
         return web.json_response({
             "fcm_initialized": False,
             "listener_running": False,
-            "authenticated": is_authenticated()
+            "authenticated": authenticated
         })
 
 
@@ -340,7 +347,10 @@ async def handle_auth_login(request: web.Request) -> web.Response:
     """Handle auth login request."""
     try:
         data = await request.json()
-        phone = data.get("phone")
+        phone = data.get("phone", "").strip()
+        
+        if not phone:
+            return web.json_response({"error": "Phone number required"}, status=400)
         
         from .api_wrapper import request_auth_code
         await request_auth_code(phone)
@@ -348,15 +358,18 @@ async def handle_auth_login(request: web.Request) -> web.Response:
         return web.json_response({"message": "SMS код отправлен"})
     except Exception as e:
         _LOGGER.error(f"Auth login error: {e}")
-        return web.json_response({"detail": str(e)}, status=400)
+        return web.json_response({"error": str(e)}, status=400)
 
 
 async def handle_auth_verify(request: web.Request) -> web.Response:
     """Handle auth verify request."""
     try:
         data = await request.json()
-        phone = data.get("phone")
-        code = data.get("code")
+        phone = data.get("phone", "").strip()
+        code = data.get("code", "").strip()
+        
+        if not phone or not code:
+            return web.json_response({"error": "Phone and code required"}, status=400)
         
         from .api_wrapper import verify_auth_code
         result = await verify_auth_code(phone, code)
@@ -364,7 +377,7 @@ async def handle_auth_verify(request: web.Request) -> web.Response:
         return web.json_response({"message": "Авторизация успешна", **result})
     except Exception as e:
         _LOGGER.error(f"Auth verify error: {e}")
-        return web.json_response({"detail": str(e)}, status=401)
+        return web.json_response({"error": str(e)}, status=401)
 
 
 async def handle_stream(request: web.Request) -> web.Response:
@@ -377,4 +390,3 @@ async def handle_stream(request: web.Request) -> web.Response:
         return web.json_response(stream)
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
-

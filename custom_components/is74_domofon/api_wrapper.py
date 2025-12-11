@@ -1,9 +1,12 @@
 """API wrapper for IS74 Domofon - connects to IS74 API directly."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -19,11 +22,11 @@ USER_AGENT = "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
 _session: aiohttp.ClientSession | None = None
 _device_id: str | None = None
 _auth_id: str | None = None
+_executor = ThreadPoolExecutor(max_workers=2)
 
 
 def get_config_path() -> Path:
     """Get config directory path."""
-    # Try different possible locations
     paths = [
         Path("/config/is74_domofon"),  # HA Docker
         Path.home() / ".homeassistant" / "is74_domofon",  # HA Core
@@ -37,12 +40,11 @@ def get_config_path() -> Path:
         except Exception:
             continue
     
-    # Fallback
     return Path.home() / ".is74_domofon"
 
 
-def load_tokens() -> dict | None:
-    """Load tokens from config."""
+def _load_tokens_sync() -> dict | None:
+    """Load tokens from config (sync version)."""
     tokens_file = get_config_path() / "tokens.json"
     if tokens_file.exists():
         try:
@@ -52,8 +54,8 @@ def load_tokens() -> dict | None:
     return None
 
 
-def save_tokens(data: dict) -> bool:
-    """Save tokens to config."""
+def _save_tokens_sync(data: dict) -> bool:
+    """Save tokens to config (sync version)."""
     try:
         config_path = get_config_path()
         config_path.mkdir(parents=True, exist_ok=True)
@@ -66,6 +68,18 @@ def save_tokens(data: dict) -> bool:
         return False
 
 
+async def load_tokens() -> dict | None:
+    """Load tokens from config (async version)."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_executor, _load_tokens_sync)
+
+
+async def save_tokens(data: dict) -> bool:
+    """Save tokens to config (async version)."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_executor, _save_tokens_sync, data)
+
+
 async def get_session() -> aiohttp.ClientSession:
     """Get or create aiohttp session."""
     global _session, _device_id
@@ -73,7 +87,7 @@ async def get_session() -> aiohttp.ClientSession:
     if _session is None or _session.closed:
         # Generate device ID if not exists
         if _device_id is None:
-            tokens = load_tokens()
+            tokens = await load_tokens()
             _device_id = tokens.get("device_id") if tokens else None
             if not _device_id:
                 _device_id = uuid.uuid4().hex[:16]
@@ -86,7 +100,7 @@ async def get_session() -> aiohttp.ClientSession:
         }
         
         # Add auth token if exists
-        tokens = load_tokens()
+        tokens = await load_tokens()
         if tokens and tokens.get("access_token"):
             headers["Authorization"] = f"Bearer {tokens['access_token']}"
         
@@ -97,14 +111,13 @@ async def get_session() -> aiohttp.ClientSession:
 
 async def request_auth_code(phone: str) -> dict:
     """Request SMS auth code."""
-    global _device_id, _auth_id
+    global _device_id, _auth_id, _session
     
     # Generate new device ID for auth flow
     _device_id = uuid.uuid4().hex[:16]
     _LOGGER.info(f"Using device_id for auth: {_device_id}")
     
     # Close existing session to use new device_id
-    global _session
     if _session and not _session.closed:
         await _session.close()
         _session = None
@@ -138,19 +151,18 @@ async def request_auth_code(phone: str) -> dict:
             _LOGGER.info(f"Received authId: {_auth_id}")
         
         # Save phone and device_id
-        save_tokens({"phone": phone, "device_id": _device_id})
+        await save_tokens({"phone": phone, "device_id": _device_id})
         
         return result
 
 
 async def verify_auth_code(phone: str, code: str) -> dict:
     """Verify SMS code and get access token."""
-    global _auth_id
+    global _auth_id, _session, _device_id
     
     session = await get_session()
     
     # Step 1: Check confirm code
-    # Correct endpoint: /mobile/auth/check-confirm
     url = f"{IS74_API_URL}/mobile/auth/check-confirm"
     
     # Send as form-urlencoded
@@ -190,7 +202,6 @@ async def verify_auth_code(phone: str, code: str) -> dict:
         _LOGGER.info(f"Got authId: {auth_id}, user_id: {user_id}")
         
         # Step 2: Get access token
-        # Correct endpoint: /mobile/auth/get-token
         token_url = f"{IS74_API_URL}/mobile/auth/get-token"
         token_data = {
             "authId": auth_id,
@@ -213,7 +224,7 @@ async def verify_auth_code(phone: str, code: str) -> dict:
                 raise Exception(f"Invalid token JSON: {token_text}")
             
             # Save tokens
-            tokens = load_tokens() or {}
+            tokens = await load_tokens() or {}
             tokens.update({
                 "access_token": token_result.get("TOKEN"),
                 "user_id": token_result.get("USER_ID"),
@@ -222,10 +233,9 @@ async def verify_auth_code(phone: str, code: str) -> dict:
                 "device_id": _device_id,
                 "authId": auth_id,
             })
-            save_tokens(tokens)
+            await save_tokens(tokens)
             
             # Reset session to use new token
-            global _session
             if _session and not _session.closed:
                 await _session.close()
                 _session = None
@@ -402,7 +412,7 @@ async def get_video_stream(camera_uuid: str) -> dict:
 
 async def get_fcm_status() -> dict:
     """Get FCM status."""
-    tokens = load_tokens()
+    tokens = await load_tokens()
     return {
         "fcm_initialized": False,
         "listener_running": False,

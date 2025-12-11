@@ -23,6 +23,8 @@ from .const import (
     SERVICE_START_FCM,
     SERVICE_STOP_FCM,
     EVENT_DOOR_OPENED,
+    EVENT_INCOMING_CALL,
+    EVENT_AUTO_OPENED,
     ATTR_DEVICE_ID,
 )
 
@@ -31,6 +33,9 @@ _LOGGER = logging.getLogger(__name__)
 # Default port for embedded server
 EMBEDDED_SERVER_PORT = 8099
 
+# Configuration keys
+CONF_AUTO_START_FCM = "auto_start_fcm"
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up IS74 Domofon from a config entry."""
@@ -38,6 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     api_url = entry.data.get(CONF_API_URL, "")
     use_embedded = entry.data.get("use_embedded_server", True)
+    auto_start_fcm = entry.data.get(CONF_AUTO_START_FCM, True)
     
     # Start embedded server if enabled
     if use_embedded or not api_url or api_url == "embedded":
@@ -77,6 +83,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Register services
     await async_setup_services(hass, client)
+    
+    # Auto-start FCM if enabled and authenticated
+    if auto_start_fcm:
+        try:
+            status = await client.get_status()
+            if status.get("authenticated"):
+                _LOGGER.info("Auto-starting FCM service...")
+                await client.start_fcm()
+                _LOGGER.info("FCM service auto-started successfully")
+        except Exception as e:
+            _LOGGER.warning(f"Failed to auto-start FCM (will try again later): {e}")
     
     return True
 

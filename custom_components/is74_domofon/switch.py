@@ -154,6 +154,17 @@ class IS74FCMSwitch(CoordinatorEntity, SwitchEntity):
         fcm = self.coordinator.data.get("fcm_status", {})
         return fcm.get("listener_running", False)
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes for FCM."""
+        fcm = self.coordinator.data.get("fcm_status", {})
+        return {
+            "fcm_initialized": fcm.get("fcm_initialized", False),
+            "has_fcm_creds": fcm.get("has_fcm_creds", False),
+            "fcm_token": fcm.get("fcm_token"),
+            "device_id": fcm.get("device_id"),
+        }
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Start FCM service."""
         await self._client.start_fcm()

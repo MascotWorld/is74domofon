@@ -26,9 +26,15 @@ toggle_auto_open:
 
 start_fcm:
   name: Start FCM
-  description: Start the FCM push notification service
+  description: >
+    Start the FCM push notification service.
+    This enables real-time notifications for incoming intercom calls.
+    Requires authentication to be completed first.
+    Fires 'is74_domofon_incoming_call' event on incoming calls.
 
 stop_fcm:
   name: Stop FCM
-  description: Stop the FCM push notification service
+  description: >
+    Stop the FCM push notification service.
+    Push notifications for incoming calls will no longer be received.
 

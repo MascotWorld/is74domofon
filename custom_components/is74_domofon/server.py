@@ -15,15 +15,20 @@ _LOGGER = logging.getLogger(__name__)
 _server_runner: web.AppRunner | None = None
 _auto_open_enabled = False
 _executor = ThreadPoolExecutor(max_workers=2)
+_hass = None  # Home Assistant instance reference
+_fcm_task: asyncio.Task | None = None  # FCM background task
 
 
 async def setup_server(hass, port: int = 8099) -> bool:
     """Set up the embedded API server."""
-    global _server_runner
+    global _server_runner, _hass
     
     if _server_runner is not None:
         _LOGGER.warning("Server already running")
         return True
+    
+    # Store hass reference globally
+    _hass = hass
     
     app = web.Application()
     
@@ -48,6 +53,10 @@ async def setup_server(hass, port: int = 8099) -> bool:
     # Add CORS middleware
     app.middlewares.append(cors_middleware)
     
+    # Set up FCM notification callback
+    from .api_wrapper import set_fcm_notification_callback
+    set_fcm_notification_callback(_handle_fcm_notification)
+    
     _server_runner = web.AppRunner(app)
     await _server_runner.setup()
     
@@ -60,12 +69,80 @@ async def setup_server(hass, port: int = 8099) -> bool:
 
 async def stop_server() -> None:
     """Stop the embedded API server."""
-    global _server_runner
+    global _server_runner, _fcm_task
+    
+    # Stop FCM task if running
+    if _fcm_task is not None:
+        _fcm_task.cancel()
+        try:
+            await _fcm_task
+        except asyncio.CancelledError:
+            pass
+        _fcm_task = None
+    
+    # Stop FCM service
+    try:
+        from .api_wrapper import stop_fcm, set_fcm_notification_callback
+        await stop_fcm()
+        set_fcm_notification_callback(None)
+    except Exception as e:
+        _LOGGER.warning(f"Error stopping FCM: {e}")
     
     if _server_runner is not None:
         await _server_runner.cleanup()
         _server_runner = None
         _LOGGER.info("IS74 Domofon API server stopped")
+
+
+def _handle_fcm_notification(call_data: dict) -> None:
+    """Handle FCM notification and fire Home Assistant event."""
+    global _hass, _auto_open_enabled
+    
+    if _hass is None:
+        _LOGGER.warning("No Home Assistant instance available for FCM notification")
+        return
+    
+    _LOGGER.info(f"📞 FCM notification received: {call_data}")
+    
+    # Fire Home Assistant event for incoming call
+    event_data = {
+        "device_id": call_data.get("device_id"),
+        "relay_id": call_data.get("relay_id"),
+        "address": call_data.get("address"),
+        "entrance": call_data.get("entrance"),
+        "notification": call_data.get("notification"),
+        "data": call_data.get("data"),
+    }
+    
+    _hass.bus.fire("is74_domofon_incoming_call", event_data)
+    _LOGGER.info(f"✓ Fired is74_domofon_incoming_call event")
+    
+    # Auto-open if enabled
+    if _auto_open_enabled:
+        device_id = call_data.get("device_id")
+        if device_id:
+            _LOGGER.info(f"🚪 Auto-open enabled, opening door for {device_id}")
+            asyncio.create_task(_auto_open_door(device_id))
+
+
+async def _auto_open_door(device_id: str) -> None:
+    """Auto-open door when call received."""
+    global _hass
+    
+    try:
+        from .api_wrapper import open_door
+        
+        # Small delay before opening
+        await asyncio.sleep(1)
+        
+        await open_door(device_id)
+        _LOGGER.info(f"✓ Door auto-opened for {device_id}")
+        
+        # Fire event
+        if _hass:
+            _hass.bus.fire("is74_domofon_auto_opened", {"device_id": device_id})
+    except Exception as e:
+        _LOGGER.error(f"❌ Failed to auto-open door: {e}")
 
 
 @web.middleware
@@ -325,21 +402,45 @@ async def handle_fcm_status(request: web.Request) -> web.Response:
 
 async def handle_fcm_start(request: web.Request) -> web.Response:
     """Handle FCM start request."""
+    global _fcm_task
+    
     try:
-        from .api_wrapper import start_fcm
-        await start_fcm()
-        return web.json_response({"message": "FCM started"})
+        from .api_wrapper import start_fcm, get_fcm_status
+        
+        # Check if already running
+        status = await get_fcm_status()
+        if status.get("listener_running"):
+            return web.json_response({"message": "FCM already running", "status": status})
+        
+        # Start FCM
+        result = await start_fcm()
+        
+        return web.json_response(result)
     except Exception as e:
+        _LOGGER.error(f"FCM start error: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
 
 async def handle_fcm_stop(request: web.Request) -> web.Response:
     """Handle FCM stop request."""
+    global _fcm_task
+    
     try:
         from .api_wrapper import stop_fcm
-        await stop_fcm()
-        return web.json_response({"message": "FCM stopped"})
+        
+        # Cancel FCM task if running
+        if _fcm_task is not None:
+            _fcm_task.cancel()
+            try:
+                await _fcm_task
+            except asyncio.CancelledError:
+                pass
+            _fcm_task = None
+        
+        result = await stop_fcm()
+        return web.json_response(result)
     except Exception as e:
+        _LOGGER.error(f"FCM stop error: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
 

@@ -3,9 +3,12 @@
     "step": {
       "user": {
         "title": "Connect to IS74 Intercom",
-        "description": "Enter your IS74 API server address",
+        "description": "Configure IS74 Intercom integration. Can start embedded API server or connect to external.",
         "data": {
-          "api_url": "API Server URL"
+          "use_embedded_server": "Use embedded server",
+          "server_port": "Server port",
+          "api_url": "External server URL (if not using embedded)",
+          "auto_start_fcm": "Auto-start FCM (push notifications for calls)"
         }
       }
     },
@@ -13,6 +16,7 @@
       "cannot_connect": "Failed to connect to server",
       "auth_required": "Server requires authentication",
       "service_not_ready": "Service is not ready",
+      "no_url": "Please specify server URL",
       "unknown": "Unknown error"
     },
     "abort": {
@@ -25,7 +29,8 @@
         "title": "IS74 Intercom Settings",
         "data": {
           "scan_interval": "Update interval (seconds)",
-          "auto_open_enabled": "Auto-open by default"
+          "auto_open_enabled": "Auto-open by default",
+          "auto_start_fcm": "Auto-start FCM (push notifications for calls)"
         }
       }
     }

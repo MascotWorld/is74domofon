@@ -20,6 +20,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Optional("use_embedded_server", default=True): bool,
         vol.Optional("server_port", default=8099): int,
         vol.Optional(CONF_API_URL, default=""): str,
+        vol.Optional("auto_start_fcm", default=True): bool,
     }
 )
 
@@ -51,6 +52,7 @@ class IS74DomofonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "use_embedded_server": True,
                         "server_port": port,
                         CONF_API_URL: f"http://localhost:{port}",
+                        "auto_start_fcm": user_input.get("auto_start_fcm", True),
                     },
                 )
             else:
@@ -72,6 +74,7 @@ class IS74DomofonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                         data={
                                             "use_embedded_server": False,
                                             CONF_API_URL: api_url,
+                                            "auto_start_fcm": user_input.get("auto_start_fcm", True),
                                         },
                                     )
                                 else:
@@ -129,6 +132,13 @@ class IS74DomofonOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(
                         "auto_open_enabled",
                         default=self.config_entry.options.get("auto_open_enabled", False),
+                    ): bool,
+                    vol.Optional(
+                        "auto_start_fcm",
+                        default=self.config_entry.options.get(
+                            "auto_start_fcm",
+                            self.config_entry.data.get("auto_start_fcm", True)
+                        ),
                     ): bool,
                 }
             ),

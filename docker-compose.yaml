@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  is74-domofon:
+    build: .
+    container_name: is74-domofon
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Конфиг для хранения токенов
+      - ./config:/app/config
+      # Если хочешь шарить конфиг с HA
+      # - /path/to/homeassistant/config/is74_domofon:/app/config
+    environment:
+      - LOG_LEVEL=info
+    networks:
+      - homeassistant
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  homeassistant:
+    external: true
+    name: homeassistant  # Имя сети твоего HA контейнера
+

@@ -7,7 +7,6 @@ from typing import Any
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -18,7 +17,9 @@ _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_API_URL, default=DEFAULT_API_URL): str,
+        vol.Optional("use_embedded_server", default=True): bool,
+        vol.Optional("server_port", default=8099): int,
+        vol.Optional(CONF_API_URL, default=""): str,
     }
 )
 
@@ -35,39 +36,63 @@ class IS74DomofonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            api_url = user_input[CONF_API_URL]
+            use_embedded = user_input.get("use_embedded_server", True)
+            api_url = user_input.get(CONF_API_URL, "")
+            port = user_input.get("server_port", 8099)
             
-            # Test connection
-            session = async_get_clientsession(self.hass)
-            try:
-                async with session.get(f"{api_url}/status", timeout=10) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if data.get("status") == "running":
-                            # Connection successful
-                            await self.async_set_unique_id(api_url)
-                            self._abort_if_unique_id_configured()
-                            
-                            return self.async_create_entry(
-                                title="IS74 Домофон",
-                                data=user_input,
-                            )
-                        else:
-                            errors["base"] = "service_not_ready"
-                    elif response.status == 401:
-                        errors["base"] = "auth_required"
-                    else:
+            if use_embedded:
+                # Embedded server will start on setup
+                await self.async_set_unique_id(f"is74_domofon_embedded_{port}")
+                self._abort_if_unique_id_configured()
+                
+                return self.async_create_entry(
+                    title="IS74 Домофон",
+                    data={
+                        "use_embedded_server": True,
+                        "server_port": port,
+                        CONF_API_URL: f"http://localhost:{port}",
+                    },
+                )
+            else:
+                # External server - test connection
+                if not api_url:
+                    errors["base"] = "no_url"
+                else:
+                    session = async_get_clientsession(self.hass)
+                    try:
+                        async with session.get(f"{api_url}/status", timeout=10) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                if data.get("status") == "running":
+                                    await self.async_set_unique_id(api_url)
+                                    self._abort_if_unique_id_configured()
+                                    
+                                    return self.async_create_entry(
+                                        title="IS74 Домофон",
+                                        data={
+                                            "use_embedded_server": False,
+                                            CONF_API_URL: api_url,
+                                        },
+                                    )
+                                else:
+                                    errors["base"] = "service_not_ready"
+                            elif response.status == 401:
+                                errors["base"] = "auth_required"
+                            else:
+                                errors["base"] = "cannot_connect"
+                    except aiohttp.ClientError:
                         errors["base"] = "cannot_connect"
-            except aiohttp.ClientError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+                    except Exception:
+                        _LOGGER.exception("Unexpected exception")
+                        errors["base"] = "unknown"
 
         return self.async_show_form(
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
+            description_placeholders={
+                "default_port": "8099",
+            },
         )
 
     @staticmethod
@@ -108,4 +133,3 @@ class IS74DomofonOptionsFlow(config_entries.OptionsFlow):
                 }
             ),
         )
-

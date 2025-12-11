@@ -28,12 +28,29 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Default port for embedded server
+EMBEDDED_SERVER_PORT = 8099
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up IS74 Domofon from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     
-    api_url = entry.data.get(CONF_API_URL)
+    api_url = entry.data.get(CONF_API_URL, "")
+    use_embedded = entry.data.get("use_embedded_server", True)
+    
+    # Start embedded server if enabled
+    if use_embedded or not api_url or api_url == "embedded":
+        from .server import setup_server
+        port = entry.data.get("server_port", EMBEDDED_SERVER_PORT)
+        
+        try:
+            await setup_server(hass, port=port)
+            api_url = f"http://localhost:{port}"
+            _LOGGER.info(f"Embedded API server started on port {port}")
+        except Exception as e:
+            _LOGGER.error(f"Failed to start embedded server: {e}")
+            # Continue anyway, maybe external server is configured
     
     # Create API client
     session = async_get_clientsession(hass)
@@ -42,13 +59,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create coordinator
     coordinator = IS74DomofonCoordinator(hass, client)
     
-    # Fetch initial data
-    await coordinator.async_config_entry_first_refresh()
+    # Try to fetch initial data (might fail if not authenticated yet)
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception as e:
+        _LOGGER.warning(f"Initial data fetch failed (this is OK if not authenticated yet): {e}")
     
     # Store coordinator
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
         "client": client,
+        "api_url": api_url,
     }
     
     # Set up platforms
@@ -62,6 +83,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    # Stop embedded server
+    use_embedded = entry.data.get("use_embedded_server", True)
+    if use_embedded:
+        from .server import stop_server
+        await stop_server()
+    
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     
     if unload_ok:
@@ -106,18 +133,20 @@ class IS74DomofonClient:
     def __init__(self, session: aiohttp.ClientSession, api_url: str) -> None:
         """Initialize the client."""
         self._session = session
-        self._api_url = api_url.rstrip("/")
+        self._api_url = api_url.rstrip("/") if api_url else "http://localhost:8099"
     
     async def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
         """Make API request."""
         url = f"{self._api_url}{endpoint}"
         try:
             async with self._session.request(method, url, **kwargs) as response:
+                if response.status == 401:
+                    return {"error": "Not authenticated", "authenticated": False}
                 response.raise_for_status()
                 return await response.json()
         except aiohttp.ClientError as err:
             _LOGGER.error("API request failed: %s", err)
-            raise
+            return {"error": str(err)}
     
     async def get_status(self) -> dict[str, Any]:
         """Get service status."""
@@ -182,6 +211,17 @@ class IS74DomofonCoordinator(DataUpdateCoordinator):
         """Fetch data from API."""
         try:
             status = await self.client.get_status()
+            
+            # If not authenticated, return minimal data
+            if not status.get("authenticated", False):
+                return {
+                    "status": status,
+                    "devices": [],
+                    "cameras": [],
+                    "fcm_status": {"listener_running": False},
+                    "auto_open": {"enabled": False},
+                }
+            
             devices = await self.client.get_devices()
             cameras = await self.client.get_cameras()
             fcm_status = await self.client.get_fcm_status()
@@ -195,5 +235,11 @@ class IS74DomofonCoordinator(DataUpdateCoordinator):
                 "auto_open": auto_open,
             }
         except Exception as err:
-            raise UpdateFailed(f"Error fetching data: {err}") from err
-
+            _LOGGER.warning(f"Error fetching data: {err}")
+            return {
+                "status": {"status": "error", "authenticated": False},
+                "devices": [],
+                "cameras": [],
+                "fcm_status": {},
+                "auto_open": {"enabled": False},
+            }

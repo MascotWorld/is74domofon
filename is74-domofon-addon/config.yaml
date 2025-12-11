@@ -1,0 +1,30 @@
+name: "IS74 Domofon"
+description: "API сервер для интеграции домофона IS74 с Home Assistant"
+version: "1.0.0"
+slug: "is74_domofon"
+init: false
+arch:
+  - amd64
+  - aarch64
+  - armv7
+  - armhf
+  - i386
+homeassistant_api: true
+ingress: true
+ingress_port: 8099
+panel_icon: "mdi:doorbell-video"
+panel_title: "IS74 Домофон"
+ports:
+  8000/tcp: 8000
+ports_description:
+  8000/tcp: "API сервер"
+options:
+  phone: ""
+  log_level: "info"
+schema:
+  phone: str?
+  log_level: list(debug|info|warning|error)
+startup: application
+map:
+  - config:rw
+

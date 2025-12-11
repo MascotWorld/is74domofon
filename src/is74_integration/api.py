@@ -1244,7 +1244,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "is74_integration.api:app",
         host="0.0.0.0",
-        port=8000,
+        port=10777,
         reload=True,
         log_level="info"
     )

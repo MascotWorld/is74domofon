@@ -40,7 +40,7 @@ def run_fcm_in_background():
 if __name__ == "__main__":
     # Get configuration from environment
     host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("API_PORT", "8000"))
+    port = int(os.getenv("API_PORT", "10777"))
     uvicorn_log_level = os.getenv("API_LOG_LEVEL", "info").lower()
     reload = os.getenv("API_RELOAD", "false").lower() == "true"
     enable_fcm = os.getenv("ENABLE_FCM", "true").lower() == "true"

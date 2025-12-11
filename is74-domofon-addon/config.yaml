@@ -11,13 +11,13 @@ arch:
   - i386
 homeassistant_api: true
 ingress: true
-ingress_port: 8099
+ingress_port: 10777
 panel_icon: "mdi:doorbell-video"
 panel_title: "IS74 Домофон"
 ports:
-  8000/tcp: 8000
+  10777/tcp: 10777
 ports_description:
-  8000/tcp: "API сервер"
+  10777/tcp: "API сервер"
 options:
   phone: ""
   log_level: "info"

@@ -9,7 +9,7 @@ Integration service for IS74 smart intercom system with Home Assistant.
 python run_api.py
 
 # Open web interface
-open http://localhost:8000/
+open http://localhost:10777/
 ```
 
 See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.
@@ -80,7 +80,7 @@ python run_api.py
 
 5. Open web interface:
 ```
-http://localhost:8000/
+http://localhost:10777/
 ```
 
 ## API Endpoints
@@ -96,7 +96,7 @@ The service provides a REST API for integration:
 - `GET /events` - Get event history
 - `GET /status` - Service status
 
-Full API documentation available at: http://localhost:8000/docs
+Full API documentation available at: http://localhost:10777/docs
 
 
 

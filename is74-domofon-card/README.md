@@ -29,7 +29,7 @@ resources:
 ```yaml
 type: custom:is74-domofon-card
 title: Мой домофон
-api_url: http://192.168.1.100:8000
+api_url: http://192.168.1.100:10777
 entities:
   device_sensor: sensor.is74_domofon_status
   service_sensor: sensor.is74_service_status  

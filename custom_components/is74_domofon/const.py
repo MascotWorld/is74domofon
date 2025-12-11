@@ -8,7 +8,7 @@ CONF_PHONE = "phone"
 CONF_CODE = "code"
 
 # Default values
-DEFAULT_API_URL = "http://localhost:8000"
+DEFAULT_API_URL = "http://localhost:10777"
 DEFAULT_SCAN_INTERVAL = 30
 
 # Platforms

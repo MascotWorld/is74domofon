@@ -6,7 +6,7 @@ services:
     container_name: is74-domofon
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "10777:10777"
     volumes:
       # Конфиг для хранения токенов
       - ./config:/app/config
@@ -17,7 +17,7 @@ services:
     networks:
       - homeassistant
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:10777/status"]
       interval: 30s
       timeout: 10s
       retries: 3

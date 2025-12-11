@@ -31,7 +31,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 # Default port for embedded server
-EMBEDDED_SERVER_PORT = 8099
+EMBEDDED_SERVER_PORT = 10777
 
 # Configuration keys
 CONF_AUTO_START_FCM = "auto_start_fcm"
@@ -150,7 +150,7 @@ class IS74DomofonClient:
     def __init__(self, session: aiohttp.ClientSession, api_url: str) -> None:
         """Initialize the client."""
         self._session = session
-        self._api_url = api_url.rstrip("/") if api_url else "http://localhost:8099"
+        self._api_url = api_url.rstrip("/") if api_url else "http://localhost:10777"
     
     async def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
         """Make API request."""

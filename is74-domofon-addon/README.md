@@ -56,6 +56,6 @@ Home Assistant Add-on для запуска API сервера IS74 Домофо
 
 В настройках интеграции IS74 Domofon используйте URL:
 
-- Если add-on и HA на одном хосте: `http://localhost:8000`
+- Если add-on и HA на одном хосте: `http://localhost:10777`
 - Через Ingress: используйте URL из боковой панели
 

@@ -265,7 +265,7 @@ class IS74WebPanelSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the web panel URL with Home Assistant host."""
-        port = self._entry.data.get("server_port", 8099)
+        port = self._entry.data.get("server_port", 10777)
         
         # Try to get HA base URL
         try:

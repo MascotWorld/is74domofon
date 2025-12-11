@@ -20,7 +20,7 @@ COPY static/ ./static/
 RUN mkdir -p /app/config
 
 # Expose port
-EXPOSE 8000
+EXPOSE 10777
 
 # Set environment variables
 ENV LOG_LEVEL=info

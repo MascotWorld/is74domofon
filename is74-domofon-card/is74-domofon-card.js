@@ -22,7 +22,7 @@ class IS74DomofonCard extends HTMLElement {
     }
     this._config = {
       title: "IS74 Домофон",
-      api_url: "http://localhost:8000",
+      api_url: "http://localhost:10777",
       ...config,
     };
   }
@@ -68,7 +68,7 @@ class IS74DomofonCard extends HTMLElement {
   }
 
   _openWebPanel() {
-    const apiUrl = this._config.api_url || "http://localhost:8000";
+    const apiUrl = this._config.api_url || "http://localhost:10777";
     window.open(apiUrl, "_blank");
   }
 
@@ -686,7 +686,7 @@ class IS74DomofonCard extends HTMLElement {
   static getStubConfig() {
     return {
       title: "IS74 Домофон",
-      api_url: "http://localhost:8000",
+      api_url: "http://localhost:10777",
       entities: {
         device_sensor: "sensor.is74_domofon_status",
         service_sensor: "sensor.is74_service_status",
@@ -747,7 +747,7 @@ class IS74DomofonCardEditor extends HTMLElement {
         </div>
         <div class="form-row">
           <label>URL веб-панели</label>
-          <input type="text" id="api_url" value="${this._config?.api_url || 'http://localhost:8000'}" />
+          <input type="text" id="api_url" value="${this._config?.api_url || 'http://localhost:10777'}" />
         </div>
         <p>Сущности настраиваются в YAML конфигурации карточки.</p>
       </div>

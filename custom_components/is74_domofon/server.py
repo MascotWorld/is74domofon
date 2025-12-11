@@ -19,7 +19,7 @@ _hass = None  # Home Assistant instance reference
 _fcm_task: asyncio.Task | None = None  # FCM background task
 
 
-async def setup_server(hass, port: int = 8099) -> bool:
+async def setup_server(hass, port: int = 10777) -> bool:
     """Set up the embedded API server."""
     global _server_runner, _hass
     

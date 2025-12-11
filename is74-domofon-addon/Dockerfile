@@ -33,6 +33,6 @@ RUN chmod a+x /run.sh
 RUN mkdir -p /app/config
 
 # Expose port
-EXPOSE 8000
+EXPOSE 10777
 
 CMD [ "/run.sh" ]

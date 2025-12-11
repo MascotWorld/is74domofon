@@ -7,7 +7,22 @@
         "data": {
           "use_embedded_server": "Использовать встроенный сервер",
           "server_port": "Порт сервера",
-          "api_url": "URL внешнего сервера (если не используется встроенный)"
+          "api_url": "URL внешнего сервера (если не используется встроенный)",
+          "auto_start_fcm": "Автозапуск FCM (push-уведомления о звонках)"
+        }
+      },
+      "phone": {
+        "title": "Авторизация",
+        "description": "Введите номер телефона для получения SMS кода. Сервер: {api_url}",
+        "data": {
+          "phone": "Номер телефона (без +7)"
+        }
+      },
+      "code": {
+        "title": "Подтверждение",
+        "description": "Введите код из SMS, отправленный на {phone}",
+        "data": {
+          "code": "Код из SMS"
         }
       }
     },
@@ -16,7 +31,12 @@
       "auth_required": "Требуется авторизация на сервере",
       "service_not_ready": "Сервис не готов",
       "no_url": "Укажите URL сервера",
-      "unknown": "Неизвестная ошибка"
+      "unknown": "Неизвестная ошибка",
+      "server_start_failed": "Не удалось запустить сервер",
+      "phone_required": "Введите номер телефона",
+      "sms_failed": "Не удалось отправить SMS",
+      "code_required": "Введите код из SMS",
+      "invalid_code": "Неверный код"
     },
     "abort": {
       "already_configured": "Уже настроено"
@@ -28,8 +48,52 @@
         "title": "Настройки IS74 Домофон",
         "data": {
           "scan_interval": "Интервал обновления (секунды)",
-          "auto_open_enabled": "Автооткрытие по умолчанию"
+          "auto_open_enabled": "Автооткрытие по умолчанию",
+          "auto_start_fcm": "Автозапуск FCM (push-уведомления о звонках)"
         }
+      },
+      "reauth_phone": {
+        "title": "Повторная авторизация",
+        "description": "Введите номер телефона для получения SMS кода",
+        "data": {
+          "phone": "Номер телефона (без +7)"
+        }
+      },
+      "reauth_code": {
+        "title": "Подтверждение",
+        "description": "Введите код из SMS",
+        "data": {
+          "code": "Код из SMS"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "service_status": {
+        "name": "Статус сервиса"
+      },
+      "fcm_status": {
+        "name": "Push уведомления"
+      },
+      "device_id": {
+        "name": "Device ID"
+      },
+      "web_panel": {
+        "name": "Веб-панель"
+      }
+    },
+    "switch": {
+      "auto_open": {
+        "name": "Автооткрытие"
+      },
+      "fcm": {
+        "name": "Push уведомления"
+      }
+    },
+    "button": {
+      "open_door": {
+        "name": "Открыть дверь"
       }
     }
   }

@@ -10,6 +10,20 @@
           "api_url": "External server URL (if not using embedded)",
           "auto_start_fcm": "Auto-start FCM (push notifications for calls)"
         }
+      },
+      "phone": {
+        "title": "Authorization",
+        "description": "Enter your phone number to receive SMS code. Server: {api_url}",
+        "data": {
+          "phone": "Phone number (without country code)"
+        }
+      },
+      "code": {
+        "title": "Confirmation",
+        "description": "Enter the SMS code sent to {phone}",
+        "data": {
+          "code": "SMS code"
+        }
       }
     },
     "error": {
@@ -17,7 +31,12 @@
       "auth_required": "Server requires authentication",
       "service_not_ready": "Service is not ready",
       "no_url": "Please specify server URL",
-      "unknown": "Unknown error"
+      "unknown": "Unknown error",
+      "server_start_failed": "Failed to start server",
+      "phone_required": "Please enter phone number",
+      "sms_failed": "Failed to send SMS",
+      "code_required": "Please enter SMS code",
+      "invalid_code": "Invalid code"
     },
     "abort": {
       "already_configured": "Already configured"
@@ -31,6 +50,20 @@
           "scan_interval": "Update interval (seconds)",
           "auto_open_enabled": "Auto-open by default",
           "auto_start_fcm": "Auto-start FCM (push notifications for calls)"
+        }
+      },
+      "reauth_phone": {
+        "title": "Re-authentication",
+        "description": "Enter your phone number to receive SMS code",
+        "data": {
+          "phone": "Phone number"
+        }
+      },
+      "reauth_code": {
+        "title": "Confirmation",
+        "description": "Enter the SMS code",
+        "data": {
+          "code": "SMS code"
         }
       }
     }
@@ -65,4 +98,3 @@
     }
   }
 }
-

@@ -42,14 +42,14 @@
       },
       "fcm_status": {
         "name": "Push Notifications"
+      },
+      "device_id": {
+        "name": "Device ID"
       }
     },
     "switch": {
       "auto_open": {
         "name": "Auto Open"
-      },
-      "courier": {
-        "name": "Courier Mode"
       },
       "fcm": {
         "name": "Push Notifications"
@@ -58,9 +58,6 @@
     "button": {
       "open_door": {
         "name": "Open Door"
-      },
-      "reject_call": {
-        "name": "Reject Call"
       },
       "web_panel": {
         "name": "Web Panel"

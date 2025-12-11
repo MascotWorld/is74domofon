@@ -42,14 +42,14 @@
       },
       "fcm_status": {
         "name": "Push уведомления"
+      },
+      "device_id": {
+        "name": "Device ID"
       }
     },
     "switch": {
       "auto_open": {
         "name": "Автооткрытие"
-      },
-      "courier": {
-        "name": "Режим курьера"
       },
       "fcm": {
         "name": "Push уведомления"
@@ -58,9 +58,6 @@
     "button": {
       "open_door": {
         "name": "Открыть дверь"
-      },
-      "reject_call": {
-        "name": "Сбросить звонок"
       },
       "web_panel": {
         "name": "Веб-панель"

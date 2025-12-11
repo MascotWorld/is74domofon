@@ -13,7 +13,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     ICON_DOOR_OPEN,
-    ICON_REJECT,
     ICON_WEB_PANEL,
     EVENT_DOOR_OPENED,
 )
@@ -33,7 +32,6 @@ async def async_setup_entry(
     # Add buttons for each device
     for device in coordinator.data.get("devices", []):
         entities.append(IS74OpenDoorButton(coordinator, client, entry, device))
-        entities.append(IS74RejectCallButton(coordinator, client, entry, device))
     
     # Add web panel button
     entities.append(IS74WebPanelButton(coordinator, entry))
@@ -74,38 +72,6 @@ class IS74OpenDoorButton(CoordinatorEntity, ButtonEntity):
                 "device_id": self._device["id"],
                 "name": self._device.get("name"),
             })
-
-
-class IS74RejectCallButton(CoordinatorEntity, ButtonEntity):
-    """Button to reject incoming call."""
-
-    _attr_has_entity_name = True
-    _attr_icon = ICON_REJECT
-
-    def __init__(self, coordinator, client, entry: ConfigEntry, device: dict[str, Any]) -> None:
-        """Initialize the button."""
-        super().__init__(coordinator)
-        self._client = client
-        self._device = device
-        self._entry = entry
-        self._attr_unique_id = f"{DOMAIN}_{device['id']}_reject"
-        self._attr_name = "Сбросить звонок"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device["id"])},
-            name=self._device.get("name", "IS74 Домофон"),
-            manufacturer="IS74",
-            model="Intercom",
-        )
-
-    async def async_press(self) -> None:
-        """Handle button press."""
-        # Reject is essentially just not answering
-        # In the future, this could send a specific API call
-        pass
 
 
 class IS74WebPanelButton(CoordinatorEntity, ButtonEntity):

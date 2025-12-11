@@ -42,6 +42,7 @@ async def async_setup_entry(
     # Add device sensors
     for device in coordinator.data.get("devices", []):
         entities.append(IS74DeviceSensor(coordinator, entry, device))
+        entities.append(IS74DeviceIdSensor(coordinator, entry, device))
     
     # Add service status sensor
     entities.append(IS74ServiceStatusSensor(coordinator, entry))
@@ -105,6 +106,45 @@ class IS74DeviceSensor(CoordinatorEntity, SensorEntity):
                 self._device = device
                 break
         self.async_write_ha_state()
+
+
+class IS74DeviceIdSensor(CoordinatorEntity, SensorEntity):
+    """Sensor showing device MAC/ID for automations."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:identifier"
+
+    def __init__(self, coordinator, entry: ConfigEntry, device: dict[str, Any]) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._device = device
+        self._entry = entry
+        self._attr_unique_id = f"{DOMAIN}_{device['id']}_device_id"
+        self._attr_name = "Device ID"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device["id"])},
+            name=self._device.get("name", "IS74 Домофон"),
+            manufacturer="IS74",
+            model="Intercom",
+        )
+
+    @property
+    def native_value(self) -> str:
+        """Return the device ID (MAC address)."""
+        return self._device.get("id", "")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        return {
+            "mac_address": self._device.get("mac"),
+            "relay_id": self._device.get("relay_id"),
+            "address": self._device.get("address"),
+        }
 
 
 class IS74ServiceStatusSensor(CoordinatorEntity, SensorEntity):

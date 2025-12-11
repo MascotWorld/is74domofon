@@ -13,7 +13,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     ICON_AUTO_OPEN,
-    ICON_COURIER,
 )
 
 
@@ -31,7 +30,6 @@ async def async_setup_entry(
     # Add auto-open switch for each device
     for device in coordinator.data.get("devices", []):
         entities.append(IS74AutoOpenSwitch(coordinator, client, entry, device))
-        entities.append(IS74CourierModeSwitch(coordinator, client, entry, device))
     
     # Add FCM listener switch
     entities.append(IS74FCMSwitch(coordinator, client, entry))
@@ -79,49 +77,6 @@ class IS74AutoOpenSwitch(CoordinatorEntity, SwitchEntity):
         """Turn off auto-open."""
         await self._client.set_auto_open(False)
         await self.coordinator.async_request_refresh()
-
-
-class IS74CourierModeSwitch(CoordinatorEntity, SwitchEntity):
-    """Switch for courier mode (one-time auto-open)."""
-
-    _attr_has_entity_name = True
-    _attr_icon = ICON_COURIER
-
-    def __init__(self, coordinator, client, entry: ConfigEntry, device: dict[str, Any]) -> None:
-        """Initialize the switch."""
-        super().__init__(coordinator)
-        self._client = client
-        self._device = device
-        self._entry = entry
-        self._attr_unique_id = f"{DOMAIN}_{device['id']}_courier"
-        self._attr_name = "Режим курьера"
-        self._is_on = False
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device["id"])},
-            name=self._device.get("name", "IS74 Домофон"),
-            manufacturer="IS74",
-            model="Intercom",
-        )
-
-    @property
-    def is_on(self) -> bool:
-        """Return true if courier mode is enabled."""
-        return self._is_on
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Enable courier mode."""
-        self._is_on = True
-        self.async_write_ha_state()
-        # Courier mode auto-disables after first call
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Disable courier mode."""
-        self._is_on = False
-        self.async_write_ha_state()
 
 
 class IS74FCMSwitch(CoordinatorEntity, SwitchEntity):

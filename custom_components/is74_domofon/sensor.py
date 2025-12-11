@@ -50,6 +50,9 @@ async def async_setup_entry(
     # Add FCM status sensor
     entities.append(IS74FCMStatusSensor(coordinator, entry))
     
+    # Add web panel URL sensor
+    entities.append(IS74WebPanelSensor(coordinator, entry))
+    
     async_add_entities(entities)
 
 
@@ -234,4 +237,58 @@ class IS74FCMStatusSensor(CoordinatorEntity, SensorEntity):
             "has_fcm_token": fcm.get("has_fcm_token", False),
             "listener_running": fcm.get("listener_running", False),
         }
+
+
+class IS74WebPanelSensor(CoordinatorEntity, SensorEntity):
+    """Sensor showing web panel URL."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Веб-панель"
+    _attr_icon = "mdi:web"
+
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_web_panel"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="IS74 Сервис",
+            manufacturer="IS74",
+            model="Integration Service",
+        )
+
+    @property
+    def native_value(self) -> str:
+        """Return the web panel URL with Home Assistant host."""
+        port = self._entry.data.get("server_port", 8099)
+        
+        # Try to get HA base URL
+        try:
+            # Get internal URL from HA config
+            internal_url = self.coordinator.hass.config.internal_url
+            if internal_url:
+                # Extract host from URL (e.g., http://192.168.1.100:8123 -> 192.168.1.100)
+                from urllib.parse import urlparse
+                parsed = urlparse(internal_url)
+                host = parsed.hostname
+                if host:
+                    return f"http://{host}:{port}"
+        except Exception:
+            pass
+        
+        # Fallback: try to get from api config
+        try:
+            api = self.coordinator.hass.config.api
+            if api and api.local_ip:
+                return f"http://{api.local_ip}:{port}"
+        except Exception:
+            pass
+        
+        # Final fallback
+        return f"http://homeassistant.local:{port}"
 

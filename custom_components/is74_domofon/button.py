@@ -13,7 +13,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     ICON_DOOR_OPEN,
-    ICON_WEB_PANEL,
     EVENT_DOOR_OPENED,
 )
 
@@ -32,9 +31,6 @@ async def async_setup_entry(
     # Add buttons for each device
     for device in coordinator.data.get("devices", []):
         entities.append(IS74OpenDoorButton(coordinator, client, entry, device))
-    
-    # Add web panel button
-    entities.append(IS74WebPanelButton(coordinator, entry))
     
     async_add_entities(entities)
 
@@ -74,41 +70,4 @@ class IS74OpenDoorButton(CoordinatorEntity, ButtonEntity):
             })
 
 
-class IS74WebPanelButton(CoordinatorEntity, ButtonEntity):
-    """Button to open web panel."""
-
-    _attr_has_entity_name = True
-    _attr_name = "Веб-панель"
-    _attr_icon = ICON_WEB_PANEL
-
-    def __init__(self, coordinator, entry: ConfigEntry) -> None:
-        """Initialize the button."""
-        super().__init__(coordinator)
-        self._entry = entry
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_web_panel"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name="IS74 Сервис",
-            manufacturer="IS74",
-            model="Integration Service",
-        )
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
-        from .const import CONF_API_URL
-        api_url = self._entry.data.get(CONF_API_URL, "http://localhost:8000")
-        return {
-            "url": api_url,
-        }
-
-    async def async_press(self) -> None:
-        """Handle button press."""
-        # This button is informational - the URL is in attributes
-        # Frontend card will handle opening the URL
-        pass
 

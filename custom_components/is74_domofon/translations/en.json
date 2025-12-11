@@ -45,6 +45,9 @@
       },
       "device_id": {
         "name": "Device ID"
+      },
+      "web_panel": {
+        "name": "Web Panel"
       }
     },
     "switch": {
@@ -58,9 +61,6 @@
     "button": {
       "open_door": {
         "name": "Open Door"
-      },
-      "web_panel": {
-        "name": "Web Panel"
       }
     }
   }

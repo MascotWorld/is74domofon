@@ -1,0 +1,1307 @@
+{
+	"info": {
+		"_postman_id": "7f5e9354-ae09-40a3-a819-617b2345e853",
+		"name": "IS74 Intercom API",
+		"description": "API collection for IS74 smart intercom system integration",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "9322887"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "0. Pre register device with id",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Device-Id",
+								"value": "{{device_id}}",
+								"type": "text"
+							},
+							{
+								"key": "X-App-version",
+								"value": "1.30.1",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"event_name\": \"AuthScreenView\",\r\n  \"data\": \"{}\",\r\n  \"model_name\": \"Pixel 10\",\r\n  \"os_version\": \"Android 9\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://track.is74.ru/mobile/track",
+							"protocol": "https",
+							"host": [
+								"track",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"mobile",
+								"track"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1. Get Auth Code",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Post-response tests for 1. Get Auth Code",
+									"pm.test('Response is valid JSON', () => {",
+									"  pm.expect(() => pm.response.json()).to.not.throw();",
+									"});",
+									"",
+									"const json = (() => { try { return pm.response.json(); } catch (e) { return null; } })();",
+									"",
+									"pm.test('Status code is 200', () => {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has required properties with correct types', () => {",
+									"  pm.expect(json).to.be.an('object');",
+									"  pm.expect(json).to.have.property('authType');",
+									"  pm.expect(json.authType).to.be.a('number');",
+									"  pm.expect(json).to.have.property('authId');",
+									"  pm.expect(json.authId).to.be.a('string');",
+									"  pm.expect(json).to.have.property('confirmType');",
+									"  pm.expect(json.confirmType).to.be.a('number');",
+									"  pm.expect(json).to.have.property('message');",
+									"  pm.expect(json.message).to.be.a('string');",
+									"});",
+									"",
+									"pm.test('authType-specific validation and timeout checks', () => {",
+									"  pm.expect(json).to.be.an('object');",
+									"  if (json.authType === 1) {",
+									"    pm.expect(json.authId, 'authId should be non-empty when authType === 1').to.be.a('string').and.to.not.be.empty;",
+									"    // timeoutMinsDefault can be number or null",
+									"    pm.expect(json).to.have.property('timeoutMinsDefault');",
+									"    if (json.timeoutMinsDefault !== null) {",
+									"      pm.expect(json.timeoutMinsDefault).to.be.a('number');",
+									"      pm.expect(json.timeoutMinsDefault, 'timeoutMinsDefault must be > 0 when provided').to.be.above(0);",
+									"    }",
+									"  }",
+									"});",
+									"",
+									"// Save values for later requests",
+									"if (json && json.authId) {",
+									"  pm.collectionVariables.set('authId', json.authId);",
+									"}",
+									"if (json && json.message) {",
+									"  pm.environment.set('lastAuthMessage', json.message);",
+									"}",
+									"",
+									"// Final sanity test to ensure we parsed JSON",
+									"pm.test('Parsed JSON exists', () => {",
+									"  pm.expect(json, 'Response body should be parsed as JSON').to.not.be.null;",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"user-agent": true,
+							"accept": true
+						}
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json; version=v2",
+								"type": "text"
+							},
+							{
+								"key": "X-Device-Id",
+								"value": "{{device_id}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"phone\": \"{{phone}}\"\n}"
+						},
+						"url": {
+							"raw": "https://api.is74.ru/mobile/auth/get-confirm",
+							"protocol": "https",
+							"host": [
+								"api",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"mobile",
+								"auth",
+								"get-confirm"
+							]
+						},
+						"description": "Request authentication code to be sent to phone"
+					},
+					"response": [
+						{
+							"name": "1. Get Auth Code",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "User-Agent",
+										"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json; version=v2",
+										"type": "text"
+									},
+									{
+										"key": "X-Device-Id",
+										"value": "{{device_id}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"phone\": \"{{phone}}\"\n}"
+								},
+								"url": {
+									"raw": "https://api.is74.ru/mobile/auth/get-confirm",
+									"protocol": "https",
+									"host": [
+										"api",
+										"is74",
+										"ru"
+									],
+									"path": [
+										"mobile",
+										"auth",
+										"get-confirm"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "",
+							"header": [
+								{
+									"key": "Server",
+									"value": "nginx"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 10 Dec 2025 09:45:05 GMT"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=UTF-8"
+								},
+								{
+									"key": "Transfer-Encoding",
+									"value": "chunked"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=15"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Encoding"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Language"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept"
+								},
+								{
+									"key": "Access-Control-Expose-Headers",
+									"value": "X-Pagination-Current-Page, X-Pagination-Page-Count, X-Pagination-Per-Page, X-Pagination-Total-Count"
+								},
+								{
+									"key": "X-Rate-Limit-Limit",
+									"value": "5"
+								},
+								{
+									"key": "X-Rate-Limit-Remaining",
+									"value": "4"
+								},
+								{
+									"key": "X-Rate-Limit-Reset",
+									"value": "17280"
+								},
+								{
+									"key": "X-Content-Type-Options",
+									"value": "nosniff"
+								},
+								{
+									"key": "Content-Encoding",
+									"value": "gzip"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"authType\": 1,\n    \"timeoutMins\": null,\n    \"message\": \"Сейчас на номер<br>+7 (950) 727-59-86 позвонят.<br>Введите последние 4 цифры<br>звонившего номера.\",\n    \"timeoutMinsDefault\": 1,\n    \"authId\": \"7187930f61575314ddaed213b271a60c\",\n    \"confirmType\": 1\n}"
+						}
+					]
+				},
+				{
+					"name": "2. Submit Auth Code",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Tests for 2. Submit Auth Code",
+									"",
+									"(function(){",
+									"    // 1) Response status is 200",
+									"    pm.test(\"Status code is 200\", function () {",
+									"        pm.response.to.have.status(200);",
+									"    });",
+									"",
+									"    // Try to parse JSON safely",
+									"    let json;",
+									"    let isJson = false;",
+									"    try {",
+									"        json = pm.response.json();",
+									"        isJson = true;",
+									"    } catch (e) {",
+									"        isJson = false;",
+									"    }",
+									"",
+									"    pm.test(\"Response has JSON body\", function () {",
+									"        pm.expect(isJson, \"Response body is not valid JSON\").to.be.true;",
+									"    });",
+									"",
+									"    if (!isJson) {",
+									"        // If not JSON, fail the rest clearly and exit",
+									"        pm.test(\"Skipping further JSON structure tests due to non-JSON response\", function () {",
+									"            pm.expect(false, \"Subsequent JSON structure tests skipped\").to.be.true;",
+									"        });",
+									"        return;",
+									"    }",
+									"",
+									"    // 2) Validate required root properties",
+									"    pm.test(\"Body has required properties with correct types\", function () {",
+									"        pm.expect(json).to.be.an(\"object\", \"Root should be an object\");",
+									"        pm.expect(json).to.have.property(\"authId\");",
+									"        pm.expect(json.authId, \"authId should be a string\").to.be.a(\"string\");",
+									"        pm.expect(json).to.have.property(\"addresses\");",
+									"        pm.expect(json.addresses, \"addresses should be an array\").to.be.an(\"array\");",
+									"    });",
+									"",
+									"    // 4) At least one address exists",
+									"    pm.test(\"addresses has at least one item\", function () {",
+									"        pm.expect(json.addresses.length, \"addresses should contain at least one item\").to.be.greaterThan(0);",
+									"    });",
+									"",
+									"    // 3) Each address object has required props as strings",
+									"    pm.test(\"Each address has USER_ID and ADDRESS as strings\", function () {",
+									"        json.addresses.forEach((addr, idx) => {",
+									"            pm.expect(addr, `addresses[${idx}] should be an object`).to.be.an(\"object\");",
+									"            pm.expect(addr, `addresses[${idx}] missing USER_ID`).to.have.property(\"USER_ID\");",
+									"            pm.expect(addr.USER_ID, `addresses[${idx}].USER_ID should be a string`).to.be.a(\"string\");",
+									"            pm.expect(addr, `addresses[${idx}] missing ADDRESS`).to.have.property(\"ADDRESS\");",
+									"            pm.expect(addr.ADDRESS, `addresses[${idx}].ADDRESS should be a string`).to.be.a(\"string\");",
+									"        });",
+									"    });",
+									"",
+									"    // Unique USER_ID values",
+									"    pm.test(\"addresses contains unique USER_ID values\", function () {",
+									"        const ids = json.addresses.map(a => String(a.USER_ID));",
+									"        const unique = new Set(ids);",
+									"        const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);",
+									"        pm.expect(unique.size, `Duplicate USER_IDs found: ${Array.from(new Set(duplicates)).join(\", \")}`).to.equal(ids.length);",
+									"    });",
+									"",
+									"    // 5) Store variables in environment",
+									"    // Only set when data is valid and non-empty",
+									"    try {",
+									"        if (typeof json.authId === \"string\") {",
+									"            pm.environment.set(\"auth_id\", json.authId);",
+									"        }",
+									"        if (Array.isArray(json.addresses) && json.addresses.length > 0 && typeof json.addresses[0]?.USER_ID === \"string\") {",
+									"            pm.environment.set(\"selected_user_id\", String(json.addresses[0].USER_ID));",
+									"        }",
+									"    } catch (e) {",
+									"        // No-op; variable setting failures should not crash tests",
+									"    }",
+									"",
+									"})();"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"user-agent": true,
+							"accept": true
+						}
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json; version=v2",
+								"type": "text"
+							},
+							{
+								"key": "X-Device-Id",
+								"value": "{{device_id}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "phone={{phone}}&confirmCode={{auth_code}}&authId=",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://api.is74.ru/mobile/auth/check-confirm",
+							"protocol": "https",
+							"host": [
+								"api",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"mobile",
+								"auth",
+								"check-confirm"
+							]
+						},
+						"description": "Submit verification code. Returns list of addresses with USER_ID and authId. Select the needed one by user_id and remember authid. ({  \n\"authId\": \"edd0608df845a87d0cd0eaf23389ed87\",  \n\"addresses\": \\[  \n{  \n\"USER_ID\": \"16551914\",  \n\"ADDRESS\": \"Миасс, ул. Степана Разина, д. 2 (текущий адрес)\"  \n},  \n{  \n\"USER_ID\": \"29722516\",  \n\"ADDRESS\": \"Миасс, ул. Нагорная, д. 94\"  \n},  \n{  \n\"USER_ID\": \"960609\",  \n\"ADDRESS\": \"Миасс, ул. Победы, д. 2\"  \n}  \n\\]  \n})"
+					},
+					"response": [
+						{
+							"name": "2. Submit Auth Code",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/x-www-form-urlencoded"
+									},
+									{
+										"key": "User-Agent",
+										"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json; version=v2",
+										"type": "text"
+									},
+									{
+										"key": "X-Device-Id",
+										"value": "{{device_id}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "phone={{phone}}&confirmCode={{auth_code}}&authId=",
+									"options": {
+										"raw": {
+											"language": "text"
+										}
+									}
+								},
+								"url": {
+									"raw": "https://api.is74.ru/mobile/auth/check-confirm",
+									"protocol": "https",
+									"host": [
+										"api",
+										"is74",
+										"ru"
+									],
+									"path": [
+										"mobile",
+										"auth",
+										"check-confirm"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "",
+							"header": [
+								{
+									"key": "Server",
+									"value": "nginx"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 10 Dec 2025 09:48:33 GMT"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=UTF-8"
+								},
+								{
+									"key": "Transfer-Encoding",
+									"value": "chunked"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=15"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Encoding"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Language"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept"
+								},
+								{
+									"key": "Access-Control-Expose-Headers",
+									"value": "X-Pagination-Current-Page, X-Pagination-Page-Count, X-Pagination-Per-Page, X-Pagination-Total-Count"
+								},
+								{
+									"key": "X-Content-Type-Options",
+									"value": "nosniff"
+								},
+								{
+									"key": "Content-Encoding",
+									"value": "gzip"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"authId\": \"7187930f61575314ddaed213b271a60c\",\n    \"addresses\": [\n        {\n            \"USER_ID\": \"16551914\",\n            \"ADDRESS\": \"Миасс, ул. Степана Разина, д. 2 (текущий адрес)\"\n        },\n        {\n            \"USER_ID\": \"29722516\",\n            \"ADDRESS\": \"Миасс, ул. Нагорная, д. 94\"\n        },\n        {\n            \"USER_ID\": \"960609\",\n            \"ADDRESS\": \"Миасс, ул. Победы, д. 2\"\n        }\n    ]\n}"
+						}
+					]
+				},
+				{
+					"name": "3. Get Access Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Tests for 3. Get Access Token",
+									"(function(){",
+									"  // Handle auth errors early",
+									"  const code = pm.response.code;",
+									"  if (code === 401 || code === 403) {",
+									"    pm.test(\"Authorization failed (\" + code + \")\", function () {",
+									"      pm.expect(false, \"Received \" + code + \": check authId, userId, uniqueDeviceId, headers, and server-side permissions\").to.be.true;",
+									"    });",
+									"    return; // Skip further tests on auth failures",
+									"  }",
+									"",
+									"  // Status code",
+									"  pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"  });",
+									"",
+									"  // Body is valid JSON",
+									"  let json;",
+									"  pm.test(\"Response body is valid JSON\", function () {",
+									"    json = pm.response.json();",
+									"    pm.expect(json).to.be.an(\"object\");",
+									"  });",
+									"",
+									"  // Validate required fields exist",
+									"  const requiredFields = [",
+									"    \"USER_ID\",",
+									"    \"PROFILE_ID\",",
+									"    \"TOKEN\",",
+									"    \"ACCESS_BEGIN\",",
+									"    \"ACCESS_END\",",
+									"    \"ACCESS_END_LEFT\",",
+									"    \"PHONE\"",
+									"  ];",
+									"",
+									"  pm.test(\"Required fields are present\", function () {",
+									"    requiredFields.forEach(f => pm.expect(json, `Missing field: ${f}`).to.have.property(f));",
+									"  });",
+									"",
+									"  // Types and value checks",
+									"  pm.test(\"USER_ID and PROFILE_ID are numbers\", function(){",
+									"    pm.expect(json.USER_ID).to.be.a(\"number\");",
+									"    pm.expect(json.PROFILE_ID).to.be.a(\"number\");",
+									"  });",
+									"",
+									"  pm.test(\"TOKEN is a non-empty string\", function(){",
+									"    pm.expect(json.TOKEN).to.be.a(\"string\");",
+									"    pm.expect(json.TOKEN.length).to.be.greaterThan(0);",
+									"  });",
+									"",
+									"  function isValidIsoLikeDateTime(s){",
+									"    if (typeof s !== \"string\") return false;",
+									"    // Accept formats like \"YYYY-MM-DD HH:mm:ss\" or ISO \"YYYY-MM-DDTHH:mm:ssZ\" etc.",
+									"    const isoLike = /^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}(?:Z|[+-]\\d{2}:?\\d{2})?$/;",
+									"    if (!isoLike.test(s)) return false;",
+									"    const d = new Date(s.replace(\" \", \"T\"));",
+									"    return !isNaN(d.getTime());",
+									"  }",
+									"",
+									"  pm.test(\"ACCESS_BEGIN and ACCESS_END are valid ISO-like datetime strings\", function(){",
+									"    pm.expect(isValidIsoLikeDateTime(json.ACCESS_BEGIN), \"ACCESS_BEGIN invalid\").to.be.true;",
+									"    pm.expect(isValidIsoLikeDateTime(json.ACCESS_END), \"ACCESS_END invalid\").to.be.true;",
+									"  });",
+									"",
+									"  pm.test(\"ACCESS_END is later than ACCESS_BEGIN\", function(){",
+									"    const begin = new Date(String(json.ACCESS_BEGIN).replace(\" \", \"T\")).getTime();",
+									"    const end = new Date(String(json.ACCESS_END).replace(\" \", \"T\")).getTime();",
+									"    pm.expect(end, \"ACCESS_END should be later than ACCESS_BEGIN\").to.be.above(begin);",
+									"  });",
+									"",
+									"  pm.test(\"ACCESS_END_LEFT is a non-negative integer\", function(){",
+									"    pm.expect(json.ACCESS_END_LEFT).to.be.a(\"number\");",
+									"    pm.expect(Number.isInteger(json.ACCESS_END_LEFT), \"ACCESS_END_LEFT must be an integer\").to.be.true;",
+									"    pm.expect(json.ACCESS_END_LEFT).to.be.at.least(0);",
+									"  });",
+									"",
+									"  pm.test(\"PHONE is a number or a string of digits\", function(){",
+									"    const v = json.PHONE;",
+									"    const ok = (typeof v === \"number\" && Number.isFinite(v)) || (typeof v === \"string\" && /^\\d+$/.test(v));",
+									"    pm.expect(ok, \"PHONE must be numeric or digit string\").to.be.true;",
+									"  });",
+									"",
+									"  // Extract and store variables",
+									"  if (json && typeof json === 'object') {",
+									"    if (typeof json.TOKEN === 'string' && json.TOKEN.length > 0) {",
+									"      pm.collectionVariables.set('access_token', json.TOKEN);",
+									"      pm.test(\"Set collection variable: access_token\", function(){",
+									"        pm.expect(pm.collectionVariables.get('access_token')).to.eql(json.TOKEN);",
+									"      });",
+									"    }",
+									"",
+									"    if (typeof json.UNIQUE_DEVICE_ID === 'string' && json.UNIQUE_DEVICE_ID.length > 0) {",
+									"      pm.collectionVariables.set('device_id', json.UNIQUE_DEVICE_ID);",
+									"      pm.test(\"Set collection variable: device_id\", function(){",
+									"        pm.expect(pm.collectionVariables.get('device_id')).to.eql(json.UNIQUE_DEVICE_ID);",
+									"      });",
+									"    }",
+									"  }",
+									"",
+									"  // Optional: log summary counts",
+									"  pm.test(\"Response contains expected structure\", function(){",
+									"    pm.expect(Object.keys(json).length).to.be.at.least(requiredFields.length);",
+									"  });",
+									"})();"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"user-agent": true,
+							"accept": true
+						}
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json; version=v2",
+								"type": "text"
+							},
+							{
+								"key": "X-Device-Id",
+								"value": "{{device_id}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "authId",
+									"value": "{{authid}}",
+									"type": "text"
+								},
+								{
+									"key": "userId",
+									"value": "{{user_id}}",
+									"type": "text"
+								},
+								{
+									"key": "uniqueDeviceId",
+									"value": "{{device_id}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://api.is74.ru/mobile/auth/get-token",
+							"protocol": "https",
+							"host": [
+								"api",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"mobile",
+								"auth",
+								"get-token"
+							]
+						},
+						"description": "Get access token for API requests.\n\nResponse example:\n```json\n{\n  \"USER_ID\": 16551914,\n  \"PROFILE_ID\": 75376,\n  \"APP\": \"mobile\",\n  \"ACCESS_BEGIN\": \"2025-12-09 19:26:54\",\n  \"ACCESS_END\": \"2026-12-09 19:26:54\",\n  \"TOKEN\": \"66893c9d9171b546caf539a6cb2676db\",\n  \"AUTH_TYPE\": \"phone\",\n  \"UNIQUE_DEVICE_ID\": \"63b5542671490961\",\n  \"REMOTE_ADDR\": \"5.79.150.222\",\n  \"PHONE\": 9030896568,\n  \"LAST_CHECK_DATE\": \"2025-12-09 19:26:54\",\n  \"ACCESS_END_LEFT\": 31536000\n}\n```"
+					},
+					"response": [
+						{
+							"name": "3. Get Access Token",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "User-Agent",
+										"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json; version=v2",
+										"type": "text"
+									},
+									{
+										"key": "X-Device-Id",
+										"value": "{{device_id}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "urlencoded",
+									"urlencoded": [
+										{
+											"key": "authId",
+											"value": "{{authid}}",
+											"type": "text"
+										},
+										{
+											"key": "userId",
+											"value": "{{user_id}}",
+											"type": "text"
+										},
+										{
+											"key": "uniqueDeviceId",
+											"value": "{{device_id}}",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "https://api.is74.ru/mobile/auth/get-token",
+									"protocol": "https",
+									"host": [
+										"api",
+										"is74",
+										"ru"
+									],
+									"path": [
+										"mobile",
+										"auth",
+										"get-token"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "",
+							"header": [
+								{
+									"key": "Server",
+									"value": "nginx"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 10 Dec 2025 09:50:13 GMT"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=UTF-8"
+								},
+								{
+									"key": "Transfer-Encoding",
+									"value": "chunked"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=15"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Encoding"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Language"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept"
+								},
+								{
+									"key": "Access-Control-Expose-Headers",
+									"value": "X-Pagination-Current-Page, X-Pagination-Page-Count, X-Pagination-Per-Page, X-Pagination-Total-Count"
+								},
+								{
+									"key": "X-Content-Type-Options",
+									"value": "nosniff"
+								},
+								{
+									"key": "Content-Encoding",
+									"value": "gzip"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"USER_ID\": 16551914,\n    \"PROFILE_ID\": 74456,\n    \"APP\": \"mobile\",\n    \"ACCESS_BEGIN\": \"2025-12-10 14:50:13\",\n    \"ACCESS_END\": \"2026-12-10 14:50:13\",\n    \"TOKEN\": \"fda2a9c56a566931bb48a09de8d771fe\",\n    \"AUTH_TYPE\": \"phone\",\n    \"UNIQUE_DEVICE_ID\": \"63b5542671490961\",\n    \"REMOTE_ADDR\": \"5.79.150.222\",\n    \"PHONE\": 9507275986,\n    \"LAST_CHECK_DATE\": \"2025-12-10 14:50:13\",\n    \"ACCESS_END_LEFT\": 31536000\n}"
+						}
+					]
+				},
+				{
+					"name": "4. Check Token",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"user-agent": true,
+							"accept": true
+						}
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accesstoken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json; version=v2",
+								"type": "text"
+							},
+							{
+								"key": "X-Device-Id",
+								"value": "{{device_id}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://api.is74.ru/token/check",
+							"protocol": "https",
+							"host": [
+								"api",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"token",
+								"check"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Firebase",
+			"item": [
+				{
+					"name": "Get Firebase Config",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							}
+						],
+						"url": {
+							"raw": "https://api.is74.ru/mobile/config/get-firebase-config",
+							"protocol": "https",
+							"host": [
+								"api",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"mobile",
+								"config",
+								"get-firebase-config"
+							]
+						},
+						"description": "Get Firebase configuration.\n\nResponse example:\n```json\n{\n  \"groups\": [8723],\n  \"lawStatus\": \"fizik\",\n  \"profileRole\": \"1\"\n}\n```"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Firebase Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"appVersion\": \"1.30.1-GMS-b3c075fbb\",\n  \"firstOpenTime\": \"2025-12-09T15:00:00.000Z\",\n  \"timeZone\": \"GMT\",\n  \"appInstanceIdToken\": \"{{firebase_instance_token}}\",\n  \"languageCode\": \"en-US\",\n  \"appBuild\": \"2024040812\",\n  \"appInstanceId\": \"{{firebase_instance_id}}\",\n  \"countryCode\": \"US\",\n  \"analyticsUserProperties\": {\n    \"first_install_time\": \"2025-12-09\",\n    \"building_id\": \"214132\",\n    \"app_version\": \"1.30.1\",\n    \"profile_id\": \"75376\",\n    \"build_number\": \"2024040812\",\n    \"profile_role_id\": \"1\",\n    \"abonent_group\": \"[8723]\",\n    \"abonent_id\": \"16551914\",\n    \"android_id\": \"63b5542671490961\",\n    \"abonent_type\": \"абонентское\",\n    \"lawStatus\": \"fizik\",\n    \"city_id\": \"4\"\n  },\n  \"appId\": \"1:361180765175:android:9c0fafffa6c60062\",\n  \"platformVersion\": \"28\",\n  \"sdkVersion\": \"21.5.0\",\n  \"packageName\": \"com.intersvyaz.lk\"\n}"
+						},
+						"url": {
+							"raw": "https://firebaseremoteconfig.googleapis.com/v1/projects/361180765175/namespaces/firebase:fetch",
+							"protocol": "https",
+							"host": [
+								"firebaseremoteconfig",
+								"googleapis",
+								"com"
+							],
+							"path": [
+								"v1",
+								"projects",
+								"361180765175",
+								"namespaces",
+								"firebase:fetch"
+							]
+						},
+						"description": "Register device for Firebase Cloud Messaging and get Firebase token for push notifications"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Intercom Devices",
+			"item": [
+				{
+					"name": "Main Get Intercom List",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							}
+						],
+						"url": {
+							"raw": "https://api.is74.ru/domofon/relays?pagination=1&pageSize=30&page=1&isShared=1",
+							"protocol": "https",
+							"host": [
+								"api",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"domofon",
+								"relays"
+							],
+							"query": [
+								{
+									"key": "pagination",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "30"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "isShared",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Get list of available intercom devices with their details, status, and control links"
+					},
+					"response": []
+				},
+				{
+					"name": "Secondary Get Intercom List",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							}
+						],
+						"url": {
+							"raw": "https://api.is74.ru/domofon/relays?mainFirst=1&pagination=1&pageSize=30&page=1&isShared=0&buildingIds=214132",
+							"protocol": "https",
+							"host": [
+								"api",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"domofon",
+								"relays"
+							],
+							"query": [
+								{
+									"key": "mainFirst",
+									"value": "1"
+								},
+								{
+									"key": "pagination",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "30"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "isShared",
+									"value": "0"
+								},
+								{
+									"key": "buildingIds",
+									"value": "214132"
+								}
+							]
+						},
+						"description": "Get list of available intercom devices with their details, status, and control links"
+					},
+					"response": []
+				},
+				{
+					"name": "Open Door",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"user-agent": true
+						}
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "https://api.is74.ru/domofon/relays/84571/open?from=app",
+							"protocol": "https",
+							"host": [
+								"api",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"domofon",
+								"relays",
+								"84571",
+								"open"
+							],
+							"query": [
+								{
+									"key": "from",
+									"value": "app"
+								}
+							]
+						},
+						"description": "Send command to open the door. Use MAC address and relay number from intercom list."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Cameras",
+			"item": [
+				{
+					"name": "Get Camera List",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"user-agent": true
+						}
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							}
+						],
+						"url": {
+							"raw": "https://cams.is74.ru/api/self-cams-with-group",
+							"protocol": "https",
+							"host": [
+								"cams",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"api",
+								"self-cams-with-group"
+							]
+						},
+						"description": "Get list of cameras with stream URLs, snapshots, and access permissions"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Camera Snapshot",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"user-agent": true
+						}
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "4.12.0 com.intersvyaz.lk/1.30.1.2024040812"
+							}
+						],
+						"url": {
+							"raw": "https://cdn.cams.is74.ru/snapshot?uuid={{camera_uuid}}&token=bearer-{{access_token}}",
+							"protocol": "https",
+							"host": [
+								"cdn",
+								"cams",
+								"is74",
+								"ru"
+							],
+							"path": [
+								"snapshot"
+							],
+							"query": [
+								{
+									"key": "uuid",
+									"value": "{{camera_uuid}}",
+									"description": "Camera UUID"
+								},
+								{
+									"key": "token",
+									"value": "bearer-{{access_token}}",
+									"description": "Bearer token with 'bearer-' prefix"
+								},
+								{
+									"key": "lossy",
+									"value": "1",
+									"description": "Use lossy compression (optional)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get current snapshot from camera"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "access_token",
+			"value": ""
+		},
+		{
+			"key": "phone",
+			"value": ""
+		},
+		{
+			"key": "auth_code",
+			"value": ""
+		},
+		{
+			"key": "authid",
+			"value": ""
+		},
+		{
+			"key": "user_id",
+			"value": ""
+		},
+		{
+			"key": "intercom_mac",
+			"value": "08:13:EC:00:03:73"
+		},
+		{
+			"key": "relay_id",
+			"value": ""
+		},
+		{
+			"key": "camera_uuid",
+			"value": ""
+		},
+		{
+			"key": "firebase_instance_id",
+			"value": ""
+		},
+		{
+			"key": "firebase_instance_token",
+			"value": ""
+		},
+		{
+			"key": "device_id",
+			"value": ""
+		},
+		{
+			"key": "accesstoken",
+			"value": "",
+			"type": "default"
+		}
+	]
+}

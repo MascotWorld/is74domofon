@@ -1,0 +1,92 @@
+{
+  "config": {
+    "step": {
+      "phone": {
+        "title": "Authorization",
+        "description": "Enter your phone number. Verification usually arrives via phone call.",
+        "data": {
+          "phone": "Phone number"
+        }
+      },
+      "code": {
+        "title": "Confirmation",
+        "description": "For {phone}: {verification_hint}",
+        "data": {
+          "code": "Verification code"
+        }
+      },
+      "accounts": {
+        "title": "Choose Addresses",
+        "description": "Select which addresses should be added to the integration."
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to server",
+      "auth_required": "Server requires authentication",
+      "service_not_ready": "Service is not ready",
+      "no_url": "Please specify server URL",
+      "unknown": "Unknown error",
+      "server_start_failed": "Failed to start server",
+      "phone_required": "Please enter phone number",
+      "sms_failed": "Failed to request verification code",
+      "code_required": "Please enter verification code",
+      "invalid_code": "Invalid verification code",
+      "no_account_selected": "Select at least one address"
+    },
+    "abort": {
+      "already_configured": "Already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "IS74 Intercom Settings",
+        "description": "Configure addresses and entity names.",
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        }
+      },
+      "entity_names": {
+        "title": "Entity Names",
+        "description": "Optionally set your own names for intercoms and cameras."
+      },
+      "reauth_phone": {
+        "title": "Re-authentication",
+        "description": "Enter your phone number. Verification usually arrives via phone call.",
+        "data": {
+          "phone": "Phone number"
+        }
+      },
+      "reauth_code": {
+        "title": "Confirmation",
+        "description": "{verification_hint}",
+        "data": {
+          "code": "Verification code"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "service_status": {
+        "name": "Service Status"
+      },
+      "fcm_status": {
+        "name": "Push Notifications"
+      },
+      "device_id": {
+        "name": "Device ID"
+      }
+    },
+    "switch": {
+      "fcm": {
+        "name": "Push Notifications"
+      }
+    },
+    "button": {
+      "open_door": {
+        "name": "Open Door"
+      }
+    }
+  }
+}

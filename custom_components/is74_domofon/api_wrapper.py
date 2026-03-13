@@ -55,6 +55,30 @@ def _build_public_headers(device_id: str) -> dict[str, str]:
     }
 
 
+async def _pre_register_device(device_id: str) -> None:
+    """Send the same pre-auth device tracking event as in the Postman collection."""
+    url = "https://track.is74.ru/mobile/track"
+    headers = {
+        "X-Device-Id": device_id,
+        "X-App-version": "1.30.1",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "event_name": "AuthScreenView",
+        "data": "{}",
+        "model_name": "Pixel 10",
+        "os_version": "Android 9",
+    }
+
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.post(url, json=payload) as resp:
+                _LOGGER.info("Pre-register device status: %s", resp.status)
+    except Exception as err:
+        # This step is not critical enough to block auth, but it may help backend routing.
+        _LOGGER.warning("Pre-register device request failed: %s", err)
+
+
 def get_config_path() -> Path:
     """Get config directory path."""
     paths = [
@@ -372,6 +396,8 @@ async def request_auth_code(phone: str) -> dict:
     if _session and not _session.closed:
         await _session.close()
         _session = None
+
+    await _pre_register_device(_device_id)
 
     session = await get_session()
 

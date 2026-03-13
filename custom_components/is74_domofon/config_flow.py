@@ -25,6 +25,24 @@ def _confirmation_hint(result: dict[str, Any] | None) -> str:
     return "Введите код из SMS."
 
 
+def _request_error_code(err: Exception) -> str:
+    """Map request-auth exceptions to Home Assistant error keys."""
+    message = str(err).lower()
+    if "429" in message or "too many requests" in message:
+        return "rate_limited"
+    if "wait a minute" in message or "получили ранее" in message:
+        return "confirmation_cooldown"
+    return "sms_failed"
+
+
+def _verify_error_code(err: Exception) -> str:
+    """Map verify-auth exceptions to Home Assistant error keys."""
+    message = str(err).lower()
+    if "no authid available" in message:
+        return "confirmation_expired"
+    return "invalid_code"
+
+
 def _account_label(account: dict[str, Any]) -> str:
     """Return a readable account label."""
     address = account.get("address") or f"USER_ID {account.get('user_id')}"
@@ -88,7 +106,7 @@ class IS74DomofonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return await self.async_step_code()
                 except Exception as err:
                     _LOGGER.error("Failed to request confirmation code: %s", err)
-                    errors["base"] = "sms_failed"
+                    errors["base"] = _request_error_code(err)
 
         return self.async_show_form(
             step_id="phone",
@@ -120,7 +138,7 @@ class IS74DomofonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                 except Exception as err:
                     _LOGGER.error("Code verification failed: %s", err)
-                    errors["base"] = "invalid_code"
+                    errors["base"] = _verify_error_code(err)
 
         phone = self._data.get(CONF_PHONE, "")
         masked_phone = phone[:3] + "****" + phone[-2:] if len(phone) > 5 else phone
@@ -349,7 +367,7 @@ class IS74DomofonOptionsFlow(config_entries.OptionsFlow):
                     return await self.async_step_reauth_code()
                 except Exception as err:
                     _LOGGER.error("Failed to request re-auth confirmation code: %s", err)
-                    errors["base"] = "sms_failed"
+                    errors["base"] = _request_error_code(err)
 
         return self.async_show_form(
             step_id="reauth_phone",
@@ -373,7 +391,7 @@ class IS74DomofonOptionsFlow(config_entries.OptionsFlow):
                     return self.async_create_entry(title="", data={})
                 except Exception as err:
                     _LOGGER.error("Re-auth verification failed: %s", err)
-                    errors["base"] = "invalid_code"
+                    errors["base"] = _verify_error_code(err)
 
         return self.async_show_form(
             step_id="reauth_code",

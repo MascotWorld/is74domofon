@@ -29,6 +29,9 @@
       "server_start_failed": "Failed to start server",
       "phone_required": "Please enter phone number",
       "sms_failed": "Failed to request verification code",
+      "rate_limited": "Too many attempts. Wait 1-2 minutes and try again.",
+      "confirmation_cooldown": "A code was already requested recently. Wait a minute or use the code from the previous call.",
+      "confirmation_expired": "Confirmation expired. Request a new call or code.",
       "code_required": "Please enter verification code",
       "invalid_code": "Invalid verification code",
       "no_account_selected": "Select at least one address"

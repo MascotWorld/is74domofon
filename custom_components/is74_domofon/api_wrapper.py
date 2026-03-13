@@ -390,6 +390,7 @@ async def request_auth_code(phone: str) -> dict:
 
     # Generate new device ID for auth flow
     _device_id = uuid.uuid4().hex[:16]
+    _auth_id = None
     _LOGGER.info(f"Using device_id for auth: {_device_id}")
 
     # Close existing session to use new device_id
@@ -442,8 +443,9 @@ async def verify_auth_code(phone: str, code: str) -> dict:
     # Step 1: Check confirm code
     url = f"{IS74_API_URL}/mobile/auth/check-confirm"
 
-    # Send as form-urlencoded
-    body = f"phone={phone}&confirmCode={code}&authId={_auth_id or ''}"
+    # Old working client sends authId as an empty form field here.
+    # The backend returns the actual authId in the check-confirm response.
+    body = f"phone={phone}&confirmCode={code}&authId="
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     _LOGGER.info(f"Verifying code at {url}")
@@ -466,6 +468,7 @@ async def verify_auth_code(phone: str, code: str) -> dict:
 
         if not auth_id:
             raise Exception("No authId in response")
+        _auth_id = auth_id
 
         if not addresses:
             raise Exception("No addresses in response")

@@ -27,6 +27,7 @@ DEVICE_MODEL = "Google Pixel 10"
 
 # Global session and state
 _session: aiohttp.ClientSession | None = None
+_auth_session: aiohttp.ClientSession | None = None
 _device_id: str | None = None
 _auth_id: str | None = None
 _executor = ThreadPoolExecutor(max_workers=2)
@@ -359,9 +360,26 @@ async def get_session() -> aiohttp.ClientSession:
     return _session
 
 
+async def get_auth_session(device_id: str, reset: bool = False) -> aiohttp.ClientSession:
+    """Get or create a dedicated unauthenticated auth session with cookies."""
+    global _auth_session
+
+    if reset and _auth_session and not _auth_session.closed:
+        await _auth_session.close()
+        _auth_session = None
+
+    if _auth_session is None or _auth_session.closed:
+        _auth_session = aiohttp.ClientSession(
+            headers=_build_public_headers(device_id),
+            cookie_jar=aiohttp.CookieJar(),
+        )
+
+    return _auth_session
+
+
 async def request_auth_code(phone: str) -> dict:
     """Request a login confirmation code or phone call."""
-    global _device_id, _auth_id, _session
+    global _device_id, _auth_id, _session, _auth_session
     phone = _normalize_phone(phone)
 
     # Generate new device ID for auth flow
@@ -373,6 +391,10 @@ async def request_auth_code(phone: str) -> dict:
         await _session.close()
         _session = None
 
+    if _auth_session and not _auth_session.closed:
+        await _auth_session.close()
+        _auth_session = None
+
     # Correct endpoint: /mobile/auth/get-confirm
     url = f"{IS74_API_URL}/mobile/auth/get-confirm"
     data = {
@@ -382,18 +404,18 @@ async def request_auth_code(phone: str) -> dict:
 
     _LOGGER.info(f"Requesting auth code from {url}")
 
-    async with aiohttp.ClientSession(headers=_build_public_headers(_device_id)) as session:
-        async with session.post(url, json=data) as resp:
-            text = await resp.text()
-            _LOGGER.info(f"Auth response status: {resp.status}, body: {text[:500]}")
+    session = await get_auth_session(_device_id, reset=True)
+    async with session.post(url, json=data) as resp:
+        text = await resp.text()
+        _LOGGER.info(f"Auth response status: {resp.status}, body: {text[:500]}")
 
-            if resp.status != 200:
-                raise Exception(f"Failed to request code: {text}")
+        if resp.status != 200:
+            raise Exception(f"Failed to request code: {text}")
 
-            try:
-                result = json.loads(text)
-            except json.JSONDecodeError:
-                raise Exception(f"Invalid JSON response: {text}")
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError:
+            raise Exception(f"Invalid JSON response: {text}")
 
     # Store authId from response
     if isinstance(result, dict) and "authId" in result:
@@ -418,7 +440,7 @@ async def request_auth_code(phone: str) -> dict:
 
 async def verify_auth_code(phone: str, code: str) -> dict:
     """Verify the confirmation code and get access tokens."""
-    global _auth_id, _session, _device_id
+    global _auth_id, _session, _device_id, _auth_session
     phone = _normalize_phone(phone)
     tokens = await load_tokens() or {}
     auth_id = _auth_id or tokens.get("authId")
@@ -439,7 +461,9 @@ async def verify_auth_code(phone: str, code: str) -> dict:
 
     _LOGGER.info(f"Verifying code at {url}")
 
-    async with aiohttp.ClientSession(headers=headers) as session:
+    session = await get_auth_session(auth_device_id)
+    session.headers.update(headers)
+    try:
         async with session.post(
             url,
             data={"phone": phone, "confirmCode": code, "authId": auth_id},
@@ -536,6 +560,10 @@ async def verify_auth_code(phone: str, code: str) -> dict:
             await _session.close()
             _session = None
 
+        if _auth_session and not _auth_session.closed:
+            await _auth_session.close()
+            _auth_session = None
+
         _LOGGER.info("Authentication successful! Loaded %s account(s)", len(accounts))
 
         return {
@@ -551,6 +579,9 @@ async def verify_auth_code(phone: str, code: str) -> dict:
                 for account in accounts
             ],
         }
+    except Exception:
+        # Keep auth session alive on failure so a retry can reuse the same cookies/context.
+        raise
 
 
 async def get_devices() -> list[dict[str, Any]]:

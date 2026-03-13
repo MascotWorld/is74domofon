@@ -3,9 +3,9 @@
     "step": {
       "phone": {
         "title": "Authorization",
-        "description": "Enter your phone number. Verification usually arrives via phone call.",
+        "description": "Enter your phone number without +7. Verification usually arrives via phone call.",
         "data": {
-          "phone": "Phone number"
+          "phone": "Phone number (without +7)"
         }
       },
       "code": {
@@ -55,9 +55,9 @@
       },
       "reauth_phone": {
         "title": "Re-authentication",
-        "description": "Enter your phone number. Verification usually arrives via phone call.",
+        "description": "Enter your phone number without +7. Verification usually arrives via phone call.",
         "data": {
-          "phone": "Phone number"
+          "phone": "Phone number (without +7)"
         }
       },
       "reauth_code": {

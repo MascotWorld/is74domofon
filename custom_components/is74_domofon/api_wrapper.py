@@ -712,10 +712,50 @@ def _on_fcm_notification(obj, notification, data_message):
             # Try to extract device info from notification
             if data_message:
                 if isinstance(data_message, dict):
-                    call_data["device_id"] = data_message.get("deviceId") or data_message.get("device_id")
-                    call_data["relay_id"] = data_message.get("relayId") or data_message.get("relay_id")
+                    call_data["device_id"] = (
+                        data_message.get("deviceId")
+                        or data_message.get("device_id")
+                        or data_message.get("device")
+                        or data_message.get("intercom_id")
+                        or data_message.get("intercomId")
+                    )
+                    call_data["relay_id"] = (
+                        data_message.get("relayId")
+                        or data_message.get("relay_id")
+                        or data_message.get("relay")
+                    )
                     call_data["address"] = data_message.get("address")
                     call_data["entrance"] = data_message.get("entrance")
+
+                    # Some pushes omit device_id but include relay_id. Recover the
+                    # device MAC from the loaded relay list so HA automations can
+                    # still call is74_domofon.open_door with the expected identifier.
+                    if not call_data["device_id"] and call_data["relay_id"]:
+                        tokens = _load_tokens_sync()
+                        accounts = _normalize_accounts(tokens)
+                        session_device_id = (
+                            tokens.get("device_id") if tokens else get_android_id_from_fcm_creds()
+                        )
+                        if accounts and session_device_id:
+                            relay_id = str(call_data["relay_id"])
+                            try:
+                                for account in accounts:
+                                    for device in asyncio.run(
+                                        _fetch_relays_for_account(account, session_device_id)
+                                    ):
+                                        if str(device.get("relay_id")) == relay_id:
+                                            call_data["device_id"] = device.get("id")
+                                            call_data["address"] = (
+                                                call_data["address"] or device.get("address")
+                                            )
+                                            call_data["entrance"] = (
+                                                call_data["entrance"] or device.get("entrance")
+                                            )
+                                            break
+                                    if call_data["device_id"]:
+                                        break
+                            except Exception as err:
+                                _LOGGER.warning("Failed to resolve device_id from relay_id: %s", err)
             
             _fcm_notification_callback(call_data)
         except Exception as e:

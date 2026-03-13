@@ -27,7 +27,6 @@ DEVICE_MODEL = "Google Pixel 10"
 
 # Global session and state
 _session: aiohttp.ClientSession | None = None
-_auth_session: aiohttp.ClientSession | None = None
 _device_id: str | None = None
 _auth_id: str | None = None
 _executor = ThreadPoolExecutor(max_workers=2)
@@ -360,151 +359,80 @@ async def get_session() -> aiohttp.ClientSession:
     return _session
 
 
-async def get_auth_session(device_id: str, reset: bool = False) -> aiohttp.ClientSession:
-    """Get or create a dedicated unauthenticated auth session with cookies."""
-    global _auth_session
-
-    if reset and _auth_session and not _auth_session.closed:
-        await _auth_session.close()
-        _auth_session = None
-
-    if _auth_session is None or _auth_session.closed:
-        _auth_session = aiohttp.ClientSession(
-            headers=_build_public_headers(device_id),
-            cookie_jar=aiohttp.CookieJar(),
-        )
-
-    return _auth_session
-
-
 async def request_auth_code(phone: str) -> dict:
     """Request a login confirmation code or phone call."""
-    global _device_id, _auth_id, _session, _auth_session
+    global _device_id, _auth_id, _session
     phone = _normalize_phone(phone)
-    tokens = await load_tokens() or {}
-    previous_auth_id = _auth_id or tokens.get("authId")
-    previous_device_id = _device_id or tokens.get("device_id")
-    previous_auth_session = _auth_session
 
-    # Generate a candidate device ID for a fresh auth flow.
-    candidate_device_id = uuid.uuid4().hex[:16]
-    _LOGGER.info(f"Using device_id for auth: {candidate_device_id}")
+    # Generate new device ID for auth flow
+    _device_id = uuid.uuid4().hex[:16]
+    _LOGGER.info(f"Using device_id for auth: {_device_id}")
 
-    # Close existing authenticated session; auth endpoints should stay unauthenticated.
+    # Close existing session to use new device_id
     if _session and not _session.closed:
         await _session.close()
         _session = None
 
+    session = await get_session()
+
     # Correct endpoint: /mobile/auth/get-confirm
     url = f"{IS74_API_URL}/mobile/auth/get-confirm"
     data = {
-        "deviceId": candidate_device_id,
+        "deviceId": _device_id,
         "phone": phone
     }
 
     _LOGGER.info(f"Requesting auth code from {url}")
 
-    temp_session = aiohttp.ClientSession(
-        headers=_build_public_headers(candidate_device_id),
-        cookie_jar=aiohttp.CookieJar(),
-    )
-    try:
-        async with temp_session.post(url, json=data) as resp:
-            text = await resp.text()
-            _LOGGER.info(f"Auth response status: {resp.status}, body: {text[:500]}")
+    async with session.post(url, json=data) as resp:
+        text = await resp.text()
+        _LOGGER.info(f"Auth response status: {resp.status}, body: {text[:500]}")
 
-            if resp.status != 200:
-                raise Exception(f"Failed to request code: {text}")
+        if resp.status != 200:
+            raise Exception(f"Failed to request code: {text}")
 
-            try:
-                result = json.loads(text)
-            except json.JSONDecodeError:
-                raise Exception(f"Invalid JSON response: {text}")
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError:
+            raise Exception(f"Invalid JSON response: {text}")
 
-        returned_auth_id = result.get("authId")
-        cooldown_message = "получили ранее" in (result.get("message") or "").lower()
-
-        if returned_auth_id:
-            if previous_auth_session and not previous_auth_session.closed:
-                await previous_auth_session.close()
-
-            _auth_session = temp_session
-            temp_session = None
-            _device_id = candidate_device_id
-            _auth_id = returned_auth_id
+        # Store authId from response
+        if isinstance(result, dict) and "authId" in result:
+            _auth_id = result["authId"]
             _LOGGER.info(f"Received authId: {_auth_id}")
-        else:
-            await temp_session.close()
-            if previous_auth_session and not previous_auth_session.closed:
-                _auth_session = previous_auth_session
 
-            if previous_auth_id and previous_device_id:
-                _auth_id = previous_auth_id
-                _device_id = previous_device_id
-                _LOGGER.info("Reusing previous auth context during confirmation cooldown")
-            elif cooldown_message:
-                raise Exception(
-                    "Confirmation already requested recently. Wait a minute or use the previous code."
-                )
+        # Save phone and device_id
+        await save_tokens({"phone": phone, "device_id": _device_id})
 
-        # Save auth context without dropping existing tokens.
-        tokens.update(
-            {
-                "phone": phone,
-                "device_id": _device_id,
-                "authId": _auth_id,
-                "confirmType": result.get("confirmType"),
-                "confirmMessage": result.get("message"),
-            }
-        )
-        await save_tokens(tokens)
         return result
-    except Exception:
-        if not temp_session.closed:
-            await temp_session.close()
-        raise
 
 
 async def verify_auth_code(phone: str, code: str) -> dict:
     """Verify the confirmation code and get access tokens."""
-    global _auth_id, _session, _device_id, _auth_session
+    global _auth_id, _session, _device_id
     phone = _normalize_phone(phone)
-    tokens = await load_tokens() or {}
-    auth_id = _auth_id or tokens.get("authId")
-    auth_device_id = _device_id or tokens.get("device_id")
-
-    if not auth_id:
-        raise Exception("No authId available for verification")
-    if not auth_device_id:
-        raise Exception("No device_id available for verification")
+    session = await get_session()
 
     # Step 1: Check confirm code
     url = f"{IS74_API_URL}/mobile/auth/check-confirm"
 
-    headers = {
-        **_build_public_headers(auth_device_id),
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
+    # Send as form-urlencoded
+    body = f"phone={phone}&confirmCode={code}&authId={_auth_id or ''}"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     _LOGGER.info(f"Verifying code at {url}")
 
-    session = await get_auth_session(auth_device_id)
-    session.headers.update(headers)
-    try:
-        async with session.post(
-            url,
-            data={"phone": phone, "confirmCode": code, "authId": auth_id},
-        ) as resp:
-            text = await resp.text()
-            _LOGGER.info(f"Check-confirm response: {resp.status}, body: {text[:500]}")
+    async with session.post(url, data=body, headers=headers) as resp:
+        text = await resp.text()
+        _LOGGER.info(f"Check-confirm response: {resp.status}, body: {text[:500]}")
 
-            if resp.status != 200:
-                raise Exception(f"Failed to verify code: {text}")
+        if resp.status != 200:
+            raise Exception(f"Failed to verify code: {text}")
 
-            try:
-                result = json.loads(text)
-            except json.JSONDecodeError:
-                raise Exception(f"Invalid JSON response: {text}")
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError:
+            raise Exception(f"Invalid JSON response: {text}")
 
         # Get authId and addresses
         auth_id = result.get("authId")
@@ -528,12 +456,12 @@ async def verify_auth_code(phone: str, code: str) -> dict:
             token_data = {
                 "authId": auth_id,
                 "userId": str(user_id),
-                "uniqueDeviceId": auth_device_id,
+                "uniqueDeviceId": _device_id,
             }
 
             _LOGGER.info("Getting token for user_id=%s from %s", user_id, token_url)
 
-            async with session.post(token_url, data=token_data) as token_resp:
+            async with session.post(token_url, data=token_data, headers=headers) as token_resp:
                 token_text = await token_resp.text()
                 _LOGGER.info(
                     "Get-token response for user_id=%s: %s, body: %s",
@@ -564,32 +492,24 @@ async def verify_auth_code(phone: str, code: str) -> dict:
             raise Exception("No usable accounts returned by get-token")
 
         primary = accounts[0]
+        tokens = await load_tokens() or {}
         tokens.update(
             {
                 "access_token": primary.get("access_token"),
                 "user_id": primary.get("user_id"),
                 "profile_id": primary.get("profile_id"),
                 "phone": phone,
-                "device_id": auth_device_id,
+                "device_id": _device_id,
                 "authId": auth_id,
                 "address": primary.get("address"),
                 "accounts": accounts,
-                "confirmType": None,
-                "confirmMessage": None,
             }
         )
         await save_tokens(tokens)
 
-        _auth_id = auth_id
-        _device_id = auth_device_id
-
         if _session and not _session.closed:
             await _session.close()
             _session = None
-
-        if _auth_session and not _auth_session.closed:
-            await _auth_session.close()
-            _auth_session = None
 
         _LOGGER.info("Authentication successful! Loaded %s account(s)", len(accounts))
 
@@ -606,9 +526,6 @@ async def verify_auth_code(phone: str, code: str) -> dict:
                 for account in accounts
             ],
         }
-    except Exception:
-        # Keep auth session alive on failure so a retry can reuse the same cookies/context.
-        raise
 
 
 async def get_devices() -> list[dict[str, Any]]:

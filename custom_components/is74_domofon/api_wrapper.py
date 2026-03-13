@@ -381,61 +381,88 @@ async def request_auth_code(phone: str) -> dict:
     """Request a login confirmation code or phone call."""
     global _device_id, _auth_id, _session, _auth_session
     phone = _normalize_phone(phone)
+    tokens = await load_tokens() or {}
+    previous_auth_id = _auth_id or tokens.get("authId")
+    previous_device_id = _device_id or tokens.get("device_id")
+    previous_auth_session = _auth_session
 
-    # Generate new device ID for auth flow
-    _device_id = uuid.uuid4().hex[:16]
-    _LOGGER.info(f"Using device_id for auth: {_device_id}")
+    # Generate a candidate device ID for a fresh auth flow.
+    candidate_device_id = uuid.uuid4().hex[:16]
+    _LOGGER.info(f"Using device_id for auth: {candidate_device_id}")
 
-    # Close existing session to use new device_id
+    # Close existing authenticated session; auth endpoints should stay unauthenticated.
     if _session and not _session.closed:
         await _session.close()
         _session = None
 
-    if _auth_session and not _auth_session.closed:
-        await _auth_session.close()
-        _auth_session = None
-
     # Correct endpoint: /mobile/auth/get-confirm
     url = f"{IS74_API_URL}/mobile/auth/get-confirm"
     data = {
-        "deviceId": _device_id,
+        "deviceId": candidate_device_id,
         "phone": phone
     }
 
     _LOGGER.info(f"Requesting auth code from {url}")
 
-    session = await get_auth_session(_device_id, reset=True)
-    async with session.post(url, json=data) as resp:
-        text = await resp.text()
-        _LOGGER.info(f"Auth response status: {resp.status}, body: {text[:500]}")
-
-        if resp.status != 200:
-            raise Exception(f"Failed to request code: {text}")
-
-        try:
-            result = json.loads(text)
-        except json.JSONDecodeError:
-            raise Exception(f"Invalid JSON response: {text}")
-
-    # Store authId from response
-    if isinstance(result, dict) and "authId" in result:
-        _auth_id = result["authId"]
-        _LOGGER.info(f"Received authId: {_auth_id}")
-
-    # Save auth context without dropping existing tokens
-    tokens = await load_tokens() or {}
-    tokens.update(
-        {
-            "phone": phone,
-            "device_id": _device_id,
-            "authId": _auth_id,
-            "confirmType": result.get("confirmType"),
-            "confirmMessage": result.get("message"),
-        }
+    temp_session = aiohttp.ClientSession(
+        headers=_build_public_headers(candidate_device_id),
+        cookie_jar=aiohttp.CookieJar(),
     )
-    await save_tokens(tokens)
+    try:
+        async with temp_session.post(url, json=data) as resp:
+            text = await resp.text()
+            _LOGGER.info(f"Auth response status: {resp.status}, body: {text[:500]}")
 
-    return result
+            if resp.status != 200:
+                raise Exception(f"Failed to request code: {text}")
+
+            try:
+                result = json.loads(text)
+            except json.JSONDecodeError:
+                raise Exception(f"Invalid JSON response: {text}")
+
+        returned_auth_id = result.get("authId")
+        cooldown_message = "получили ранее" in (result.get("message") or "").lower()
+
+        if returned_auth_id:
+            if previous_auth_session and not previous_auth_session.closed:
+                await previous_auth_session.close()
+
+            _auth_session = temp_session
+            temp_session = None
+            _device_id = candidate_device_id
+            _auth_id = returned_auth_id
+            _LOGGER.info(f"Received authId: {_auth_id}")
+        else:
+            await temp_session.close()
+            if previous_auth_session and not previous_auth_session.closed:
+                _auth_session = previous_auth_session
+
+            if previous_auth_id and previous_device_id:
+                _auth_id = previous_auth_id
+                _device_id = previous_device_id
+                _LOGGER.info("Reusing previous auth context during confirmation cooldown")
+            elif cooldown_message:
+                raise Exception(
+                    "Confirmation already requested recently. Wait a minute or use the previous code."
+                )
+
+        # Save auth context without dropping existing tokens.
+        tokens.update(
+            {
+                "phone": phone,
+                "device_id": _device_id,
+                "authId": _auth_id,
+                "confirmType": result.get("confirmType"),
+                "confirmMessage": result.get("message"),
+            }
+        )
+        await save_tokens(tokens)
+        return result
+    except Exception:
+        if not temp_session.closed:
+            await temp_session.close()
+        raise
 
 
 async def verify_auth_code(phone: str, code: str) -> dict:

@@ -1,0 +1,14 @@
+{
+  "domain": "is74_domofon",
+  "name": "IS74 Домофон",
+  "after_dependencies": ["stream"],
+  "codeowners": ["@MascotWorld"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/MascotWorld/is74domofon",
+  "integration_type": "hub",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/MascotWorld/is74domofon/issues",
+  "requirements": ["firebase-messaging>=0.2.0"],
+  "version": "1.2.0"
+}
